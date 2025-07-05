@@ -164,6 +164,86 @@ return 'ー';
 return `${formatNumberOnly(value)}${unit}`;
 };
 
+// 物件IDを生成または取得する関数（MY-から始まる8桁）
+const getPropertyId=(property)=> {
+// 既存のpropertyIdがあればそれを使用
+if (property.details.propertyId && property.details.propertyId.startsWith('MY-')) {
+return property.details.propertyId;
+}
+
+// 既存の物件番号がMY-形式ならそれを使用
+if (property.details.propertyNumber && property.details.propertyNumber.startsWith('MY-')) {
+return property.details.propertyNumber;
+}
+
+// Airtable IDからMY-形式のIDを生成
+if (property.id) {
+// Airtable IDの最後8文字を数字に変換
+const idHash = property.id.slice(-8).split('').map(char => {
+const code = char.charCodeAt(0);
+return (code % 10).toString();
+}).join('');
+return `MY-${idHash}`;
+}
+
+return 'MY-00000000';
+};
+
+// 敷金・保証金・礼金の表示フォーマット（原データのまま表示）
+const formatSecurityDeposit=(property)=> {
+// 複数のフィールドをチェック
+const fields = [
+property.details.securityDeposit,
+property.details.securityDepositAmount,
+property.details.securityDepositMonths,
+property.details.shikikin
+];
+
+for (const field of fields) {
+if (field && field !== '' && field !== '無し' && field !== 'なし') {
+// 文字列として返す（万円、ヶ月などの単位も含む）
+return String(field);
+}
+}
+return 'ー';
+};
+
+const formatGuaranteeDeposit=(property)=> {
+// 複数のフィールドをチェック
+const fields = [
+property.details.guaranteeDeposit,
+property.details.guaranteeDepositAmount,
+property.details.guaranteeDepositMonths,
+property.details.hoshokin
+];
+
+for (const field of fields) {
+if (field && field !== '' && field !== '無し' && field !== 'なし') {
+// 文字列として返す（万円、ヶ月などの単位も含む）
+return String(field);
+}
+}
+return 'ー';
+};
+
+const formatKeyMoney=(property)=> {
+// 複数のフィールドをチェック
+const fields = [
+property.details.keyMoney,
+property.details.keyMoneyAmount,
+property.details.keyMoneyMonths,
+property.details.reikin
+];
+
+for (const field of fields) {
+if (field && field !== '' && field !== '無し' && field !== 'なし') {
+// 文字列として返す（万円、ヶ月などの単位も含む）
+return String(field);
+}
+}
+return 'ー';
+};
+
 // 沿線と最寄駅の情報をフォーマット
 const formatTrainLineStation=(property)=> {
 if (!property.trainLines || property.trainLines.length === 0) {
@@ -460,10 +540,10 @@ className="py-3 sm:py-4 px-1 sm:px-2 border-b-2 border-primary-600 font-medium t
 <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
 {/* 左列 */}
 <div className="divide-y divide-gray-200">
-{/* 物件ID */}
+{/* 物件ID - MY-から始まる8桁 */}
 <div className="px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
 <span className="text-sm font-medium text-gray-700">物件ID</span>
-<span className="text-sm text-gray-900 font-mono">{property.details.propertyNumber || property.id || 'ー'}</span>
+<span className="text-sm text-gray-900 font-mono">{getPropertyId(property)}</span>
 </div>
 
 {/* 沿線と最寄駅 */}
@@ -502,22 +582,22 @@ className="py-3 sm:py-4 px-1 sm:px-2 border-b-2 border-primary-600 font-medium t
 <span className="text-sm text-gray-900">{property.details.commonAreaFee ? formatManYen(property.details.commonAreaFee) : 'ー'}</span>
 </div>
 
-{/* 敷金 */}
+{/* 敷金 - Airtableデータのまま表示 */}
 <div className="px-4 py-3 flex justify-between items-center bg-gray-50 hover:bg-gray-100">
 <span className="text-sm font-medium text-gray-700">敷金</span>
-<span className="text-sm text-gray-900">{property.details.securityDeposit ? formatManYen(property.details.securityDeposit) : 'ー'}</span>
+<span className="text-sm text-gray-900">{formatSecurityDeposit(property)}</span>
 </div>
 
-{/* 保証金 */}
+{/* 保証金 - Airtableデータのまま表示 */}
 <div className="px-4 py-3 flex justify-between items-center bg-white hover:bg-gray-50">
 <span className="text-sm font-medium text-gray-700">保証金</span>
-<span className="text-sm text-gray-900">{property.details.guaranteeDeposit ? formatManYen(property.details.guaranteeDeposit) : 'ー'}</span>
+<span className="text-sm text-gray-900">{formatGuaranteeDeposit(property)}</span>
 </div>
 
-{/* 礼金 */}
+{/* 礼金 - Airtableデータのまま表示 */}
 <div className="px-4 py-3 flex justify-between items-center bg-gray-50 hover:bg-gray-100">
 <span className="text-sm font-medium text-gray-700">礼金</span>
-<span className="text-sm text-gray-900">{property.details.keyMoney ? formatManYen(property.details.keyMoney) : 'ー'}</span>
+<span className="text-sm text-gray-900">{formatKeyMoney(property)}</span>
 </div>
 </div>
 
@@ -762,8 +842,8 @@ className="w-full bg-primary-600 text-white py-2 sm:py-3 rounded-md font-medium 
 <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">物件情報</h3>
 <div className="space-y-3">
 <div className="flex items-center justify-between">
-<span className="text-sm text-gray-600">物件番号</span>
-<span className="text-sm font-medium">{property.details.propertyNumber || property.id || 'ー'}</span>
+<span className="text-sm text-gray-600">物件ID</span>
+<span className="text-sm font-medium font-mono">{getPropertyId(property)}</span>
 </div>
 <div className="flex items-center justify-between">
 <span className="text-sm text-gray-600">データソース</span>
