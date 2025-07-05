@@ -14,6 +14,15 @@ const location=useLocation();
 const navigate=useNavigate();
 const {favoritesCount}=useFavorites();
 
+// セカンダリナビゲーション用のアイコン（ホーム、検索、マップ、インフォメーション）
+const secondaryNavigation=[ 
+{name: 'ホーム',href: '/',icon: FiHome},
+{name: '物件検索',href: '/search',icon: FiSearch},
+{name: '地図検索',href: '/map-search',icon: FiMap},
+{name: '会社概要',href: '/about',icon: FiInfo}
+];
+
+// メインナビゲーション（モバイル用）
 const navigation=[ 
 {name: 'ホーム',href: '/',icon: FiHome},
 {name: '物件検索',href: '/search',icon: FiSearch},
@@ -52,79 +61,39 @@ return (
 </div>
 </Link>
 
-{/* Desktop Navigation */}
-<nav className="hidden xl:flex items-center space-x-1 flex-1 justify-center max-w-4xl">
-{navigation.map((item)=> (
-<button
-key={item.name}
-onClick={()=> handleNavigation(item.href)}
-className={`relative flex items-center space-x-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group whitespace-nowrap min-w-0 ${
-isActive(item.href)
-? 'text-emerald-600 bg-emerald-50 shadow-sm'
-: 'text-gray-600 hover:text-emerald-600 hover:bg-gray-50'
-}`}
->
-<SafeIcon icon={item.icon} className={`text-sm transition-transform group-hover:scale-110 flex-shrink-0 ${isActive(item.href) ? 'text-emerald-600' : ''}`} />
-<span className="truncate">{item.name}</span>
-{/* Badge */}
-{item.badge > 0 && (
-<div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold animate-pulse flex-shrink-0">
-{item.badge > 99 ? '99+' : item.badge}
-</div>
-)}
-{/* Active Indicator */}
-{isActive(item.href) && (
-<motion.div
-layoutId="activeTab"
-className="absolute inset-0 bg-emerald-100 rounded-xl -z-10"
-initial={false}
-transition={{type: "spring",duration: 0.6}}
-/>
-)}
-</button>
-))}
-</nav>
-
-{/* Compact Navigation for Large Screens */}
-<nav className="hidden lg:flex xl:hidden items-center space-x-1 flex-1 justify-center">
-{navigation.slice(0,5).map((item)=> (
-<button
-key={item.name}
-onClick={()=> handleNavigation(item.href)}
-className={`relative flex items-center justify-center p-2.5 rounded-xl text-sm font-medium transition-all duration-200 group min-w-[40px] ${
-isActive(item.href)
-? 'text-emerald-600 bg-emerald-50 shadow-sm'
-: 'text-gray-600 hover:text-emerald-600 hover:bg-gray-50'
-}`}
-title={item.name}
->
-<SafeIcon icon={item.icon} className={`text-lg transition-transform group-hover:scale-110 ${isActive(item.href) ? 'text-emerald-600' : ''}`} />
-{/* Badge */}
-{item.badge > 0 && (
-<div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold animate-pulse">
-{item.badge > 9 ? '9+' : item.badge}
-</div>
-)}
-{/* Active Indicator */}
-{isActive(item.href) && (
-<motion.div
-layoutId="activeTabCompact"
-className="absolute inset-0 bg-emerald-100 rounded-xl -z-10"
-initial={false}
-transition={{type: "spring",duration: 0.6}}
-/>
-)}
-</button>
-))}
-</nav>
-
 {/* Right Side */}
 <div className="flex items-center space-x-4 flex-shrink-0">
+{/* お気に入りボタン（ログインボタンの左） */}
+<Link 
+to="/favorites"
+className={`relative flex items-center justify-center p-2.5 rounded-xl text-sm font-medium transition-all duration-200 group min-w-[40px] ${
+isActive('/favorites') 
+? 'text-emerald-600 bg-emerald-50 shadow-sm' 
+: 'text-gray-600 hover:text-emerald-600 hover:bg-gray-50'
+}`}
+title="お気に入り"
+>
+<SafeIcon icon={FiHeart} className="text-lg transition-transform group-hover:scale-110" />
+{favoritesCount > 0 && (
+<div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold animate-pulse">
+{favoritesCount > 99 ? '99+' : favoritesCount}
+</div>
+)}
+{isActive('/favorites') && (
+<motion.div 
+layoutId="activeTabHeader" 
+className="absolute inset-0 bg-emerald-100 rounded-xl -z-10" 
+initial={false} 
+transition={{type: "spring",duration: 0.6}} 
+/>
+)}
+</Link>
+
 {/* Auth Button */}
 <AuthButton />
 
 {/* Mobile menu button */}
-<button
+<button 
 onClick={()=> setIsMenuOpen(!isMenuOpen)}
 className="lg:hidden p-2.5 rounded-xl text-gray-600 hover:text-emerald-600 hover:bg-gray-50 transition-all duration-200"
 >
@@ -158,8 +127,8 @@ animate={{opacity: 1,x: 0}}
 transition={{delay: index * 0.1}}
 onClick={()=> handleNavigation(item.href)}
 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-isActive(item.href)
-? 'text-emerald-600 bg-emerald-50 shadow-sm'
+isActive(item.href) 
+? 'text-emerald-600 bg-emerald-50 shadow-sm' 
 : 'text-gray-600 hover:text-emerald-600 hover:bg-gray-50'
 }`}
 >
@@ -184,22 +153,49 @@ isActive(item.href)
 <div className="hidden md:block bg-gradient-to-r from-emerald-50 to-green-50 border-b border-emerald-100">
 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 <div className="flex items-center justify-between py-2">
-<div className="flex items-center space-x-6 text-sm">
+{/* Left Side - Main Navigation Icons */}
+<div className="flex items-center space-x-1">
+{secondaryNavigation.map((item)=> (
 <Link
-to="/restaurant-news"
+key={item.name}
+to={item.href}
+className={`relative flex items-center justify-center p-2.5 rounded-xl text-sm font-medium transition-all duration-200 group min-w-[40px] ${
+isActive(item.href) 
+? 'text-emerald-600 bg-emerald-100 shadow-sm' 
+: 'text-gray-600 hover:text-emerald-600 hover:bg-gray-50'
+}`}
+title={item.name}
+>
+<SafeIcon icon={item.icon} className="text-lg transition-transform group-hover:scale-110" />
+{isActive(item.href) && (
+<motion.div 
+layoutId="activeTabSecondary" 
+className="absolute inset-0 bg-emerald-200 rounded-xl -z-10" 
+initial={false} 
+transition={{type: "spring",duration: 0.6}} 
+/>
+)}
+</Link>
+))}
+</div>
+
+{/* Right Side - Additional Links */}
+<div className="flex items-center space-x-6 text-sm">
+<Link 
+to="/restaurant-news" 
 className="flex items-center space-x-2 text-emerald-700 hover:text-emerald-800 font-medium group whitespace-nowrap"
 >
 <SafeIcon icon={FiTrendingUp} className="text-xs group-hover:scale-110 transition-transform flex-shrink-0" />
 <span>飲食店ニュース</span>
 </Link>
-<Link
-to="/opening-support"
+<Link 
+to="/opening-support" 
 className="text-gray-600 hover:text-emerald-700 font-medium whitespace-nowrap"
 >
 開業サポート
 </Link>
-<Link
-to="/business-links"
+<Link 
+to="/business-links" 
 className="text-gray-600 hover:text-emerald-700 font-medium whitespace-nowrap"
 >
 業者リンク
@@ -211,9 +207,9 @@ className="text-gray-600 hover:text-emerald-700 font-medium whitespace-nowrap"
 
 {/* Mobile Backdrop */}
 {isMenuOpen && (
-<div
-className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
-onClick={()=> setIsMenuOpen(false)}
+<div 
+className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden" 
+onClick={()=> setIsMenuOpen(false)} 
 />
 )}
 </>
