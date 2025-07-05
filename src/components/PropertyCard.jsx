@@ -38,7 +38,7 @@ return `${Math.floor(diffDays / 30)}ヶ月前`;
 
 const isNewProperty=()=> {
 const daysAgoText=getDaysAgo(property.postedDate);
-return daysAgoText.includes('日前') && parseInt(daysAgoText) <=3;
+return daysAgoText.includes('日前') && parseInt(daysAgoText) <= 3;
 };
 
 const handleImageError=()=> {
@@ -93,11 +93,11 @@ navigate(`/property/${property.id}`);
 
 // 画像の状態を判定
 const hasMultipleImages=property.images && property.images.length > 1;
-const currentImage=property.images && property.images[currentImageIndex] 
-? property.images[currentImageIndex] 
-: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=600&h=400&fit=crop';
+const currentImage=property.images && property.images[currentImageIndex] ? 
+property.images[currentImageIndex] : 
+'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=600&h=400&fit=crop';
 
-// ホリゾンタルレイアウト（リスト表示用）
+// ホリゾンタルレイアウト（リスト表示用）- 改善版
 if (viewMode==='list') {
 return (
 <motion.div
@@ -106,11 +106,11 @@ transition={{duration: 0.2}}
 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow relative group cursor-pointer"
 onClick={handleCardClick}
 >
-<div className="flex">
-{/* 画像部分 */}
-<div className="relative w-80 h-48 flex-shrink-0">
+<div className="flex h-64"> {/* 固定高さを設定 */}
+{/* 画像部分 - アスペクト比を改善 */}
+<div className="relative w-96 h-full flex-shrink-0"> {/* w-80からw-96に変更で少し幅を広く */}
 {!imageError ? (
-<img 
+<img
 src={currentImage}
 alt={property.title}
 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -180,26 +180,26 @@ className="image-nav-button absolute right-2 top-1/2 transform -translate-y-1/2 
 )}
 </div>
 
-{/* コンテンツ部分 */}
-<div className="flex-1 p-6 flex flex-col justify-between">
-<div>
+{/* コンテンツ部分 - レイアウト改善 */}
+<div className="flex-1 p-6 flex flex-col justify-between min-w-0"> {/* min-w-0を追加 */}
+<div className="flex-1">
 {/* タイトル */}
 <h3 className="text-xl font-semibold text-gray-900 mb-3 line-clamp-2 group-hover:text-primary-600 transition-colors">
 {property.title}
 </h3>
 
-{/* 基本情報 */}
+{/* 基本情報 - 2列レイアウト */}
 <div className="grid grid-cols-2 gap-4 mb-4">
 <div className="space-y-2">
 <div className="flex items-center space-x-2 text-gray-600">
 <SafeIcon icon={FiMapPin} className="text-sm flex-shrink-0" />
-<span className="text-sm">{property.ward || property.location}</span>
+<span className="text-sm truncate">{property.ward || property.location}</span>
 </div>
 {property.nearestStation && (
 <div className="flex items-center space-x-2 text-gray-600">
 <SafeIcon icon={FiNavigation} className="text-sm flex-shrink-0" />
-<span className="text-sm">
-{property.nearestStation}駅 徒歩{property.walkingMinutes}分
+<span className="text-sm truncate">
+{property.nearestStation}駅 {property.walkingMinutes && `徒歩${property.walkingMinutes}分`}
 </span>
 </div>
 )}
@@ -220,14 +220,17 @@ className="image-nav-button absolute right-2 top-1/2 transform -translate-y-1/2 
 {property.trainLines && property.trainLines.length > 0 && (
 <div className="mb-4">
 <div className="flex flex-wrap gap-1">
-{property.trainLines.slice(0,3).map((line,index)=> (
-<span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+{property.trainLines.slice(0,2).map((line,index)=> (
+<span 
+key={index} 
+className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
+>
 {line.replace('東京メトロ','メトロ').replace('JR','')}
 </span>
 ))}
-{property.trainLines.length > 3 && (
+{property.trainLines.length > 2 && (
 <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-+{property.trainLines.length - 3}路線
++{property.trainLines.length - 2}路線
 </span>
 )}
 </div>
@@ -236,10 +239,10 @@ className="image-nav-button absolute right-2 top-1/2 transform -translate-y-1/2 
 </div>
 
 {/* 価格とアクション */}
-<div className="flex items-end justify-between">
+<div className="border-t pt-4 mt-4">
 {/* 価格表示 */}
-<div>
-<PriceDisplay 
+<div className="mb-4">
+<PriceDisplay
 rent={property.rent}
 deposit={property.deposit}
 area={property.area}
@@ -253,7 +256,7 @@ variant="primary"
 </div>
 
 {/* アクションボタン */}
-<div className="flex items-center space-x-3">
+<div className="flex items-center justify-between">
 {/* お気に入りボタン */}
 <div className="favorite-button">
 <FavoriteButton property={property} size="normal" />
@@ -269,11 +272,6 @@ onClick={(e)=> e.stopPropagation()}
 </Link>
 </div>
 </div>
-</div>
-
-{/* Favorite Button - 絶対位置 */}
-<div className="absolute top-3 right-3 favorite-button">
-<FavoriteButton property={property} size="small" className="lg:hidden" />
 </div>
 </div>
 </motion.div>
@@ -292,7 +290,7 @@ onClick={handleCardClick}
 {/* メイン画像 - 固定高さとobject-fitで調整 */}
 <div className="relative w-full h-48 bg-gray-200 overflow-hidden">
 {!imageError ? (
-<img 
+<img
 src={currentImage}
 alt={property.title}
 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -357,7 +355,10 @@ className="image-nav-button absolute right-2 top-1/2 transform -translate-y-1/2 
 <div className="absolute bottom-3 left-3">
 <div className="flex flex-wrap gap-1">
 {property.trainLines.slice(0,2).map((line,index)=> (
-<span key={index} className="bg-black bg-opacity-70 text-white px-2 py-1 text-xs rounded">
+<span 
+key={index} 
+className="bg-black bg-opacity-70 text-white px-2 py-1 text-xs rounded"
+>
 {line.replace('東京メトロ','メトロ').replace('JR','')}
 </span>
 ))}
@@ -381,14 +382,14 @@ className="image-nav-button absolute right-2 top-1/2 transform -translate-y-1/2 
 )}
 
 {/* Image Dots Indicator */}
-{hasMultipleImages && property.images.length <=5 && (
+{hasMultipleImages && property.images.length <= 5 && (
 <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex space-x-1">
 {property.images.map((_,index)=> (
 <div 
-key={index}
+key={index} 
 className={`w-1.5 h-1.5 rounded-full ${
 index===currentImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'
-}`}
+}`} 
 />
 ))}
 </div>
@@ -415,7 +416,7 @@ index===currentImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'
 <div className="flex items-center space-x-2 text-gray-600">
 <SafeIcon icon={FiNavigation} className="text-sm" />
 <span className="text-sm">
-{property.nearestStation}駅 徒歩{property.walkingMinutes}分
+{property.nearestStation}駅 {property.walkingMinutes && `徒歩${property.walkingMinutes}分`}
 </span>
 </div>
 )}
@@ -434,7 +435,7 @@ index===currentImageIndex ? 'bg-white' : 'bg-white bg-opacity-50'
 
 {/* Price Display - カテゴリタグを無効化 */}
 <div className="border-t pt-3">
-<PriceDisplay 
+<PriceDisplay
 rent={property.rent}
 deposit={property.deposit}
 area={property.area}

@@ -16,7 +16,7 @@ overflow: hidden;
 .property-image-container {
 position: relative;
 width: 100%;
-height: 200px;/* 固定高さ */
+height: 200px; /* 固定高さ */
 overflow: hidden;
 background-color: #f3f4f6;
 }
@@ -24,7 +24,7 @@ background-color: #f3f4f6;
 .property-image {
 width: 100%;
 height: 100%;
-object-fit: cover;/* アスペクト比を保持しつつ、コンテナを埋める */
+object-fit: cover; /* アスペクト比を保持しつつ、コンテナを埋める */
 transition: transform 0.3s ease;
 }
 
@@ -36,7 +36,7 @@ transform: scale(1.05);
 .detail-image-container {
 position: relative;
 width: 100%;
-height: 500px;/* より大きな固定高さ */
+height: 500px; /* より大きな固定高さ */
 overflow: hidden;
 background-color: #f3f4f6;
 border-radius: 0.5rem;
@@ -45,8 +45,49 @@ border-radius: 0.5rem;
 .detail-main-image {
 width: 100%;
 height: 100%;
-object-fit: contain;/* 画像全体を表示、余白が出る場合もある */
+object-fit: contain; /* 画像全体を表示、余白が出る場合もある */
 cursor: pointer;
+}
+
+/* 横長カード専用スタイル */
+.horizontal-card {
+height: 280px; /* 固定高さを少し高く */
+}
+
+.horizontal-card .image-section {
+width: 400px; /* 画像部分の幅を調整 */
+min-width: 400px;
+height: 100%;
+}
+
+.horizontal-card .content-section {
+flex: 1;
+min-width: 0; /* 重要: flexアイテムの縮小を許可 */
+display: flex;
+flex-direction: column;
+}
+
+/* リスト表示時の改善 */
+@media (min-width: 768px) {
+.horizontal-card {
+height: 320px; /* タブレット以上でより高く */
+}
+  
+.horizontal-card .image-section {
+width: 450px;
+min-width: 450px;
+}
+}
+
+@media (min-width: 1024px) {
+.horizontal-card {
+height: 280px; /* デスクトップで最適化 */
+}
+  
+.horizontal-card .image-section {
+width: 420px;
+min-width: 420px;
+}
 }
 
 /* カードの画像エラー時のスタイル */
@@ -64,7 +105,7 @@ flex-direction: column;
 /* アスペクト比ユーティリティ */
 .aspect-w-16 {
 position: relative;
-padding-bottom: 56.25%;/* 16:9 aspect ratio */
+padding-bottom: 56.25%; /* 16:9 aspect ratio */
 }
 
 .aspect-h-9 {
@@ -97,11 +138,7 @@ background: #a8a8a8;
 
 /* Smooth transitions */
 * {
-transition: color 0.2s ease,
-background-color 0.2s ease,
-border-color 0.2s ease,
-transform 0.2s ease,
-box-shadow 0.2s ease;
+transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* Focus styles */
@@ -110,7 +147,7 @@ input:focus,
 select:focus,
 textarea:focus {
 outline: none;
-box-shadow: 0 0 0 3px rgba(14,165,233,0.1);
+box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
 /* Loading animation */
@@ -124,14 +161,14 @@ background-position: calc(200px + 100%) 0;
 }
 
 .shimmer {
-background: linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);
+background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
 background-size: 200px 100%;
 animation: shimmer 1.5s infinite;
 }
 
 /* Carousel animations */
 @keyframes pulse-green {
-0%,100% {
+0%, 100% {
 opacity: 1;
 }
 50% {
@@ -140,17 +177,17 @@ opacity: 0.7;
 }
 
 .animate-pulse-green {
-animation: pulse-green 2s cubic-bezier(0.4,0,0.6,1) infinite;
+animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Carousel hover effects */
 .carousel-card {
-transition: transform 0.3s ease,box-shadow 0.3s ease;
+transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .carousel-card:hover {
 transform: translateY(-4px);
-box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
 
 /* Smooth carousel transitions */
@@ -162,13 +199,13 @@ border-radius: 0.5rem;
 /* New badge animation - 赤色に変更 */
 @keyframes new-badge-pulse {
 0% {
-box-shadow: 0 0 0 0 rgba(239,68,68,0.7);
+box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
 }
 70% {
-box-shadow: 0 0 0 10px rgba(239,68,68,0);
+box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
 }
 100% {
-box-shadow: 0 0 0 0 rgba(239,68,68,0);
+box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
 }
 }
 
@@ -183,7 +220,7 @@ transition: all 0.3s ease;
 
 .property-card:hover {
 transform: translateY(-4px);
-box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
 }
 
 .property-card:hover .property-image {
@@ -206,7 +243,7 @@ transition: all 0.2s ease;
 
 .image-thumbnail:hover {
 transform: scale(1.05);
-box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Contact form enhancements */
@@ -214,7 +251,7 @@ box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 .contact-form textarea:focus,
 .contact-form select:focus {
 border-color: #22c55e;
-box-shadow: 0 0 0 3px rgba(34,197,94,0.1);
+box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
 }
 
 /* Modal styles */
@@ -229,12 +266,12 @@ transition: all 0.2s ease;
 
 .quick-action-btn:hover {
 transform: translateY(-1px);
-box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
 }
 
 /* Property stats */
 .property-stats {
-background: linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%);
+background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 /* Responsive design helpers */
@@ -258,6 +295,21 @@ height: 180px;
 
 .detail-image-container {
 height: 300px;
+}
+
+/* モバイルでは横長カードを縦に */
+.horizontal-card {
+height: auto !important;
+}
+
+.horizontal-card .flex {
+flex-direction: column !important;
+}
+
+.horizontal-card .image-section {
+width: 100% !important;
+min-width: 100% !important;
+height: 200px !important;
 }
 }
 
@@ -294,17 +346,17 @@ animation: slideInRight 0.5s ease-out;
 
 /* Badge styles - 新着バッジを赤に変更 */
 .badge-new {
-background: linear-gradient(135deg,#ef4444,#dc2626);
+background: linear-gradient(135deg, #ef4444, #dc2626);
 animation: pulse 2s infinite;
 }
 
 .badge-featured {
-background: linear-gradient(135deg,#ef4444,#dc2626);
+background: linear-gradient(135deg, #ef4444, #dc2626);
 animation: pulse 2s infinite;
 }
 
 .badge-urgent {
-background: linear-gradient(135deg,#f59e0b,#d97706);
+background: linear-gradient(135deg, #f59e0b, #d97706);
 animation: pulse 1.5s infinite;
 }
 
@@ -319,12 +371,12 @@ border-radius: 0.5rem;
 
 .property-pin {
 transition: all 0.2s ease;
-filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .property-pin:hover {
 transform: scale(1.1);
-filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
 }
 
 .map-tooltip {
@@ -337,13 +389,13 @@ background: white;
 border: 1px solid #e5e7eb;
 border-radius: 0.5rem;
 padding: 0.75rem;
-box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 transition: all 0.2s ease;
 }
 
 .map-control-btn:hover {
 background: #f9fafb;
-box-shadow: 0 6px 8px -1px rgba(0,0,0,0.15);
+box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
 }
 
 /* Dragging cursor */
@@ -357,7 +409,7 @@ cursor: grabbing !important;
 
 /* Price display enhancements */
 .price-highlight {
-background: linear-gradient(135deg,#22c55e,#16a34a);
+background: linear-gradient(135deg, #22c55e, #16a34a);
 background-clip: text;
 -webkit-background-clip: text;
 -webkit-text-fill-color: transparent;
@@ -365,28 +417,28 @@ background-clip: text;
 
 /* Loading states */
 .skeleton {
-background: linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);
+background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
 background-size: 200% 100%;
 animation: shimmer 1.5s infinite;
 }
 
 /* Success states */
 .success-message {
-background: linear-gradient(135deg,#d1fae5,#a7f3d0);
+background: linear-gradient(135deg, #d1fae5, #a7f3d0);
 border: 1px solid #84cc16;
 color: #166534;
 }
 
 /* Error states */
 .error-message {
-background: linear-gradient(135deg,#fee2e2,#fecaca);
+background: linear-gradient(135deg, #fee2e2, #fecaca);
 border: 1px solid #ef4444;
 color: #991b1b;
 }
 
 /* Warning states */
 .warning-message {
-background: linear-gradient(135deg,#fef3c7,#fde68a);
+background: linear-gradient(135deg, #fef3c7, #fde68a);
 border: 1px solid #f59e0b;
 color: #92400e;
 }

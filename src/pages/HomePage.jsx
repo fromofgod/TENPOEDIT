@@ -80,6 +80,31 @@ const startIndex=currentSlide * 3;
 return newProperties.slice(startIndex,startIndex + 3);
 };
 
+// 新着物件数を計算（過去30日以内）
+const getNewPropertiesCount=()=> {
+if (!properties.length) return 0;
+const thirtyDaysAgo=new Date();
+thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+return properties.filter(property=> {
+const updatedDate=new Date(property.lastUpdated);
+return updatedDate >= thirtyDaysAgo;
+}).length;
+};
+
+// サンプル統計データ（実際のシステムでは実データを使用）
+const getDisplayStats=()=> {
+const newCount=getNewPropertiesCount();
+const totalCount=stats?.total || properties.length || 0;
+
+return {
+newProperties: newCount,
+totalProperties: totalCount,
+members: 1250, // サンプル会員数
+contracts: 890  // サンプル契約件数
+};
+};
+
 const storeInfoSections=[
 {
 icon: FiTool,
@@ -133,6 +158,8 @@ className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transit
 );
 }
 
+const displayStats=getDisplayStats();
+
 return (
 <div className="min-h-screen">
 <AirtableDebugPanel properties={properties} stats={stats} />
@@ -171,26 +198,24 @@ className="text-center"
 飲食店舗物件の検索ならお任せ下さい。東京都内の最新物件情報をいち早くお届けいたします。
 </p>
 
-{stats && (
 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 max-w-2xl mx-auto">
 <div className="bg-white/15 backdrop-blur-sm rounded-lg p-4">
-<div className="text-2xl font-bold text-white">{stats.total}</div>
+<div className="text-2xl font-bold text-white">{displayStats.newProperties}</div>
+<div className="text-green-100 text-sm">新着物件数</div>
+</div>
+<div className="bg-white/15 backdrop-blur-sm rounded-lg p-4">
+<div className="text-2xl font-bold text-white">{displayStats.totalProperties}</div>
 <div className="text-green-100 text-sm">総物件数</div>
 </div>
 <div className="bg-white/15 backdrop-blur-sm rounded-lg p-4">
-<div className="text-2xl font-bold text-white">{(stats.averageRent / 10000).toFixed(0)}万</div>
-<div className="text-green-100 text-sm">平均賃料/月</div>
+<div className="text-2xl font-bold text-white">{displayStats.members.toLocaleString()}</div>
+<div className="text-green-100 text-sm">会員数</div>
 </div>
 <div className="bg-white/15 backdrop-blur-sm rounded-lg p-4">
-<div className="text-2xl font-bold text-white">{stats.averageArea}</div>
-<div className="text-green-100 text-sm">平均面積㎡</div>
-</div>
-<div className="bg-white/15 backdrop-blur-sm rounded-lg p-4">
-<div className="text-2xl font-bold text-white">{stats.withCoordinates}</div>
-<div className="text-green-100 text-sm">地図対応物件</div>
+<div className="text-2xl font-bold text-white">{displayStats.contracts.toLocaleString()}</div>
+<div className="text-green-100 text-sm">契約件数</div>
 </div>
 </div>
-)}
 
 <div className="flex flex-col sm:flex-row gap-4 justify-center">
 <button

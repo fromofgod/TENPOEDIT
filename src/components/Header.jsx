@@ -6,7 +6,7 @@ import SafeIcon from '../common/SafeIcon';
 import AuthButton from './AuthButton';
 import {useFavorites} from '../contexts/FavoritesContext';
 
-const {FiMenu,FiX,FiHome,FiSearch,FiMap,FiInfo,FiMail,FiHeart,FiTrendingUp}=FiIcons;
+const {FiMenu,FiX,FiHome,FiSearch,FiMap,FiInfo,FiMail,FiHeart,FiTrendingUp,FiTool,FiLink}=FiIcons;
 
 const Header=()=> {
 const [isMenuOpen,setIsMenuOpen]=useState(false);
@@ -15,21 +15,21 @@ const navigate=useNavigate();
 const {favoritesCount}=useFavorites();
 
 // セカンダリナビゲーション用のアイコン（ホーム、検索、マップ、インフォメーション）
-const secondaryNavigation=[ 
+const secondaryNavigation=[
 {name: 'ホーム',href: '/',icon: FiHome},
 {name: '物件検索',href: '/search',icon: FiSearch},
 {name: '地図検索',href: '/map-search',icon: FiMap},
 {name: '会社概要',href: '/about',icon: FiInfo}
 ];
 
-// メインナビゲーション（モバイル用）
-const navigation=[ 
+// メインナビゲーション（モバイル用）- 項目を変更
+const navigation=[
 {name: 'ホーム',href: '/',icon: FiHome},
 {name: '物件検索',href: '/search',icon: FiSearch},
 {name: '地図検索',href: '/map-search',icon: FiMap},
-{name: 'お気に入り',href: '/favorites',icon: FiHeart,badge: favoritesCount},
-{name: '会社概要',href: '/about',icon: FiInfo},
-{name: 'お問合せ',href: '/contact',icon: FiMail},
+{name: '飲食店ニュース',href: '/restaurant-news',icon: FiTrendingUp},
+{name: '開業サポート',href: '/opening-support',icon: FiTool},
+{name: '業者リンク',href: '/business-links',icon: FiLink},
 ];
 
 const isActive=(path)=> location.pathname===path;
@@ -65,7 +65,7 @@ return (
 <div className="flex items-center space-x-4 flex-shrink-0">
 {/* お気に入りボタン（ログインボタンの左） */}
 <Link 
-to="/favorites"
+to="/favorites" 
 className={`relative flex items-center justify-center p-2.5 rounded-xl text-sm font-medium transition-all duration-200 group min-w-[40px] ${
 isActive('/favorites') 
 ? 'text-emerald-600 bg-emerald-50 shadow-sm' 
@@ -80,11 +80,11 @@ title="お気に入り"
 </div>
 )}
 {isActive('/favorites') && (
-<motion.div 
-layoutId="activeTabHeader" 
-className="absolute inset-0 bg-emerald-100 rounded-xl -z-10" 
-initial={false} 
-transition={{type: "spring",duration: 0.6}} 
+<motion.div
+layoutId="activeTabHeader"
+className="absolute inset-0 bg-emerald-100 rounded-xl -z-10"
+initial={false}
+transition={{type: "spring", duration: 0.6}}
 />
 )}
 </Link>
@@ -93,7 +93,7 @@ transition={{type: "spring",duration: 0.6}}
 <AuthButton />
 
 {/* Mobile menu button */}
-<button 
+<button
 onClick={()=> setIsMenuOpen(!isMenuOpen)}
 className="lg:hidden p-2.5 rounded-xl text-gray-600 hover:text-emerald-600 hover:bg-gray-50 transition-all duration-200"
 >
@@ -112,23 +112,23 @@ transition={{duration: 0.2}}
 <AnimatePresence>
 {isMenuOpen && (
 <motion.div
-initial={{opacity: 0,height: 0}}
-animate={{opacity: 1,height: 'auto'}}
-exit={{opacity: 0,height: 0}}
-transition={{duration: 0.3,ease: "easeInOut"}}
+initial={{opacity: 0, height: 0}}
+animate={{opacity: 1, height: 'auto'}}
+exit={{opacity: 0, height: 0}}
+transition={{duration: 0.3, ease: "easeInOut"}}
 className="lg:hidden border-t border-gray-200/50 bg-white/95 backdrop-blur-md"
 >
 <nav className="px-4 py-4 space-y-2 max-h-96 overflow-y-auto">
-{navigation.map((item,index)=> (
+{navigation.map((item, index)=> (
 <motion.button
 key={item.name}
-initial={{opacity: 0,x: -20}}
-animate={{opacity: 1,x: 0}}
+initial={{opacity: 0, x: -20}}
+animate={{opacity: 1, x: 0}}
 transition={{delay: index * 0.1}}
 onClick={()=> handleNavigation(item.href)}
 className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
-isActive(item.href) 
-? 'text-emerald-600 bg-emerald-50 shadow-sm' 
+isActive(item.href)
+? 'text-emerald-600 bg-emerald-50 shadow-sm'
 : 'text-gray-600 hover:text-emerald-600 hover:bg-gray-50'
 }`}
 >
@@ -160,19 +160,19 @@ isActive(item.href)
 key={item.name}
 to={item.href}
 className={`relative flex items-center justify-center p-2.5 rounded-xl text-sm font-medium transition-all duration-200 group min-w-[40px] ${
-isActive(item.href) 
-? 'text-emerald-600 bg-emerald-100 shadow-sm' 
+isActive(item.href)
+? 'text-emerald-600 bg-emerald-100 shadow-sm'
 : 'text-gray-600 hover:text-emerald-600 hover:bg-gray-50'
 }`}
 title={item.name}
 >
 <SafeIcon icon={item.icon} className="text-lg transition-transform group-hover:scale-110" />
 {isActive(item.href) && (
-<motion.div 
-layoutId="activeTabSecondary" 
-className="absolute inset-0 bg-emerald-200 rounded-xl -z-10" 
-initial={false} 
-transition={{type: "spring",duration: 0.6}} 
+<motion.div
+layoutId="activeTabSecondary"
+className="absolute inset-0 bg-emerald-200 rounded-xl -z-10"
+initial={false}
+transition={{type: "spring", duration: 0.6}}
 />
 )}
 </Link>
