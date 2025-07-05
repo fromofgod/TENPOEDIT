@@ -8,7 +8,7 @@ import PropertyCard from '../components/PropertyCard';
 import AirtableDebugPanel from '../components/AirtableDebugPanel';
 import {useAirtableProperties} from '../hooks/useAirtableProperties';
 
-const {FiSearch,FiTrendingUp,FiUsers,FiShield,FiArrowRight,FiMapPin,FiNavigation,FiPlus,FiMessageCircle,FiMap,FiTool,FiBookOpen,FiLink,FiFileText,FiDatabase,FiAlertCircle,FiChevronLeft,FiChevronRight,FiPause,FiPlay}=FiIcons;
+const {FiSearch,FiTrendingUp,FiUsers,FiShield,FiArrowRight,FiMapPin,FiNavigation,FiMessageCircle,FiMap,FiTool,FiBookOpen,FiLink,FiFileText,FiDatabase,FiAlertCircle,FiChevronLeft,FiChevronRight,FiPause,FiPlay}=FiIcons;
 
 const HomePage=()=> {
 const {properties,loading,error,stats,connectionStatus}=useAirtableProperties();
@@ -28,27 +28,28 @@ const featured=properties
 .slice(0,6);
 setFeaturedProperties(featured);
 
-// 新着物件（最新10件）
+// 新着物件（最新9件に変更 - 3件x3ページ）
 const newest=properties
 .sort((a,b)=> new Date(b.lastUpdated) - new Date(a.lastUpdated))
-.slice(0,10);
+.slice(0,9);
 setNewProperties(newest);
 }
 },[properties]);
 
-// カルーセルの自動再生
+// カルーセルの自動再生（3件表示に対応）
 useEffect(()=> {
-if (!isAutoPlaying || isHovered || newProperties.length === 0) return;
+if (!isAutoPlaying || isHovered || newProperties.length===0) return;
 
-const interval = setInterval(() => {
-setCurrentSlide((prev) => {
-const maxSlides = Math.max(0, newProperties.length - 3);
-return prev >= maxSlides ? 0 : prev + 1;
+const interval=setInterval(()=> {
+setCurrentSlide((prev)=> {
+// 3件表示なので、newProperties.length - 3 がmax
+const maxSlides=Math.max(0,Math.ceil(newProperties.length / 3) - 1);
+return prev >=maxSlides ? 0 : prev + 1;
 });
-}, 4000);
+},4000);
 
-return () => clearInterval(interval);
-}, [isAutoPlaying, isHovered, newProperties.length]);
+return ()=> clearInterval(interval);
+},[isAutoPlaying,isHovered,newProperties.length]);
 
 const handleNavigation=(path)=> {
 try {
@@ -59,21 +60,27 @@ window.location.href=path;
 }
 };
 
-const nextSlide = () => {
-const maxSlides = Math.max(0, newProperties.length - 3);
-setCurrentSlide(prev => prev >= maxSlides ? 0 : prev + 1);
+const nextSlide=()=> {
+const maxSlides=Math.max(0,Math.ceil(newProperties.length / 3) - 1);
+setCurrentSlide(prev=> prev >=maxSlides ? 0 : prev + 1);
 };
 
-const prevSlide = () => {
-const maxSlides = Math.max(0, newProperties.length - 3);
-setCurrentSlide(prev => prev === 0 ? maxSlides : prev - 1);
+const prevSlide=()=> {
+const maxSlides=Math.max(0,Math.ceil(newProperties.length / 3) - 1);
+setCurrentSlide(prev=> prev===0 ? maxSlides : prev - 1);
 };
 
-const goToSlide = (index) => {
+const goToSlide=(index)=> {
 setCurrentSlide(index);
 };
 
-const storeInfoSections=[
+// 現在のスライドで表示する物件を取得
+const getCurrentSlideProperties=()=> {
+const startIndex=currentSlide * 3;
+return newProperties.slice(startIndex,startIndex + 3);
+};
+
+const storeInfoSections=[ 
 {icon: FiTool,title: '開業サポート',description: '店舗開業に必要な手続きから資金調達まで専門スタッフがサポート',link: '/opening-support',color: 'bg-emerald-100 text-emerald-600'},
 {icon: FiTrendingUp,title: '飲食店最新ニュース',description: '業界動向、トレンド情報、成功事例など飲食業界の最新情報',link: '/restaurant-news',color: 'bg-green-100 text-green-600'},
 {icon: FiLink,title: '業者リンク',description: '内装業者、設備会社、デザイナーなど信頼できるパートナー企業',link: '/business-links',color: 'bg-teal-100 text-teal-600'},
@@ -108,9 +115,7 @@ return (
 
 {/* Hero Section */}
 <section className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white overflow-hidden">
-<div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
-style={{backgroundImage: "url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1920&h=1080&fit=crop')"}}
-/>
+<div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20" style={{backgroundImage: "url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=1920&h=1080&fit=crop')"}} />
 <div className="absolute inset-0 bg-gradient-to-br from-blue-800/80 via-indigo-700/70 to-purple-600/80" />
 <div className="absolute top-20 right-10 w-32 h-32 bg-white/10 rounded-full blur-xl" />
 <div className="absolute bottom-20 left-10 w-24 h-24 bg-blue-300/20 rounded-full blur-lg" />
@@ -130,7 +135,8 @@ className="text-center"
 )}
 
 <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-東京都内の <br />
+東京都内の
+<br />
 <span className="text-blue-200">理想の店舗物件</span>を見つけよう
 </h1>
 <p className="text-xl md:text-2xl mb-8 text-blue-100 max-w-3xl mx-auto">
@@ -175,14 +181,6 @@ className="inline-flex items-center justify-center space-x-2 border-2 border-whi
 <SafeIcon icon={FiMap} />
 <span>地図から検索</span>
 </button>
-<button
-type="button"
-onClick={()=> handleNavigation('/list-property')}
-className="inline-flex items-center justify-center space-x-2 border-2 border-blue-300 text-blue-200 px-8 py-4 rounded-lg font-semibold hover:bg-blue-300 hover:text-blue-800 transition-all duration-300 transform hover:scale-105"
->
-<SafeIcon icon={FiPlus} />
-<span>物件を掲載する</span>
-</button>
 </div>
 </motion.div>
 </div>
@@ -216,11 +214,10 @@ transition={{duration: 0.8,delay: 0.3}}
 <h2 className="text-3xl font-bold text-gray-900 mb-2">新着物件</h2>
 <p className="text-lg text-gray-600">Airtableから取得した最新の物件情報</p>
 </div>
-
 {/* Controls */}
 <div className="flex items-center space-x-4">
 <button
-onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+onClick={()=> setIsAutoPlaying(!isAutoPlaying)}
 className="p-2 rounded-full bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
 title={isAutoPlaying ? '自動再生を停止' : '自動再生を開始'}
 >
@@ -243,40 +240,42 @@ className="p-2 rounded-full bg-white border border-gray-200 hover:bg-gray-50 tra
 </div>
 </div>
 
-{/* Carousel */}
-<div 
-className="relative overflow-hidden rounded-lg"
-onMouseEnter={() => setIsHovered(true)}
-onMouseLeave={() => setIsHovered(false)}
+{/* Carousel - 3件表示でサイズ統一 */}
+<div
+className="relative overflow-hidden"
+onMouseEnter={()=> setIsHovered(true)}
+onMouseLeave={()=> setIsHovered(false)}
 >
-<div 
-className="flex transition-transform duration-500 ease-in-out"
-style={{ 
-transform: `translateX(-${currentSlide * (100 / 3)}%)`,
-width: `${(newProperties.length / 3) * 100}%`
-}}
+<motion.div
+key={currentSlide}
+initial={{opacity: 0,x: 50}}
+animate={{opacity: 1,x: 0}}
+exit={{opacity: 0,x: -50}}
+transition={{duration: 0.5,ease: "easeInOut"}}
+className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
 >
-{newProperties.map((property) => (
-<div key={property.id} className="w-1/3 flex-shrink-0 px-3">
-<div className="transform transition-transform duration-300 hover:scale-105">
+{getCurrentSlideProperties().map((property,index)=> (
+<motion.div
+key={property.id}
+initial={{opacity: 0,y: 20}}
+animate={{opacity: 1,y: 0}}
+transition={{duration: 0.5,delay: index * 0.1}}
+>
 <PropertyCard property={property} />
-</div>
-</div>
+</motion.div>
 ))}
-</div>
+</motion.div>
 </div>
 
 {/* Dots Indicator */}
 {newProperties.length > 3 && (
 <div className="flex justify-center mt-6 space-x-2">
-{Array.from({ length: Math.max(0, newProperties.length - 2) }).map((_, index) => (
+{Array.from({length: Math.ceil(newProperties.length / 3)}).map((_,index)=> (
 <button
 key={index}
-onClick={() => goToSlide(index)}
+onClick={()=> goToSlide(index)}
 className={`w-3 h-3 rounded-full transition-colors ${
-currentSlide === index 
-? 'bg-green-600' 
-: 'bg-gray-300 hover:bg-gray-400'
+currentSlide===index ? 'bg-green-600' : 'bg-gray-300 hover:bg-gray-400'
 }`}
 />
 ))}
