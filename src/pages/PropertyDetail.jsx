@@ -9,7 +9,7 @@ import PropertyCard from '../components/PropertyCard';
 import PropertyMap from '../components/PropertyMap';
 import {fetchPropertyById} from '../services/airtableService';
 
-const {FiMapPin,FiSquare,FiClock,FiPhone,FiMail,FiChevronLeft,FiChevronRight,FiShare2,FiCalendar,FiNavigation,FiHome,FiUsers,FiWifi,FiCar,FiShield,FiZap,FiDroplet,FiThermometer,FiCamera,FiMaximize2,FiInfo,FiTrendingUp,FiStar,FiEye,FiPrint,FiDownload,FiExternalLink,FiMap,FiX}=FiIcons;
+const {FiMapPin,FiSquare,FiClock,FiPhone,FiMail,FiChevronLeft,FiChevronRight,FiShare2,FiCalendar,FiNavigation,FiHome,FiUsers,FiWifi,FiCar,FiShield,FiZap,FiDroplet,FiThermometer,FiCamera,FiMaximize2,FiInfo,FiTrendingUp,FiStar,FiEye,FiPrint,FiDownload,FiExternalLink,FiMap,FiX,FiTrain,FiBuilding,FiDollarSign,FiKey,FiCalendarCheck}=FiIcons;
 
 const PropertyDetail=()=> {
 const {id}=useParams();
@@ -86,10 +86,7 @@ inquiryType: 'viewing'
 
 const handleInputChange=(e)=> {
 const {name,value}=e.target;
-setContactForm(prev=> ({
-...prev,
-[name]: value
-}));
+setContactForm(prev=> ({...prev,[name]: value}));
 };
 
 const getPropertyTypeLabel=(type)=> {
@@ -110,18 +107,65 @@ if (!price) return '応談';
 return `¥${new Intl.NumberFormat('ja-JP').format(price)}`;
 };
 
+// 面積の表示フォーマット関数を改善
+const formatArea=(area)=> {
+if (!area || area===0 || area==='無し' || area==='なし') return '';
+const numArea=parseFloat(area);
+if (isNaN(numArea)) return '';
+// 小数点以下2桁まで表示し、不要な0を削除
+return numArea % 1===0 ? numArea.toString() : numArea.toFixed(2).replace(/\.?0+$/,'');
+};
+
 // 単位を含まない数値のフォーマット（単位重複を防ぐ）
 const formatNumberOnly=(value)=> {
-if (!value) return '';
+if (!value || value==='無し' || value==='なし') return '';
+const numValue=parseFloat(value);
+if (isNaN(numValue)) return '';
 // 数値のみを返す（単位は別途表示）
-return new Intl.NumberFormat('ja-JP').format(parseFloat(value));
+return new Intl.NumberFormat('ja-JP').format(numValue);
+};
+
+// 万円表示のフォーマット関数を追加
+const formatManYen=(value)=> {
+if (!value || value===0 || value==='無し' || value==='なし') return '';
+const numValue=parseFloat(value);
+if (isNaN(numValue)) return '';
+
+if (numValue < 1) {
+// 1万円未満は千円単位で表示
+return `${Math.round(numValue * 10)}千円`;
+} else if (numValue===Math.floor(numValue)) {
+// 整数の場合
+return `${Math.round(numValue)}万円`;
+} else {
+// 小数点がある場合、適切な桁数で表示
+return `${numValue.toFixed(2).replace(/\.?0+$/,'')}万円`;
+}
+};
+
+// 値が存在するかチェックする関数（より厳密に）
+const hasValue=(value)=> {
+return value !==null && 
+value !==undefined && 
+value !=='' && 
+value !==0 && 
+value !=='無し' && 
+value !=='なし' && 
+value !=='NULL' && 
+value !=='null' && 
+!isNaN(parseFloat(value));
+};
+
+// 値を表示用にフォーマットする関数
+const formatDisplayValue=(value,unit='',fallback='設定なし')=> {
+if (!hasValue(value)) {
+return `<span class="text-gray-400 italic">${fallback}</span>`;
+}
+return `${formatNumberOnly(value)}${unit}`;
 };
 
 const tabs=[
-{id: 'overview',label: '概要',icon: FiHome},
-{id: 'details',label: '詳細情報',icon: FiInfo},
-{id: 'location',label: '立地・交通',icon: FiMapPin},
-{id: 'equipment',label: '設備・条件',icon: FiZap}
+{id: 'overview',label: '物件概要',icon: FiHome}
 ];
 
 if (loading) {
@@ -181,8 +225,10 @@ return (
 </ol>
 </nav>
 
-{/* Property Header */}
-<div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
+{/* Property Header - シンプル化 */}
+{property.rent && (
+<div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8">
+{/* Property Header Content */}
 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
 <div className="flex-1 min-w-0">
 <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -198,9 +244,11 @@ return (
 Airtable連携
 </span>
 </div>
+
 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-3 leading-tight">
 {property.title}
 </h1>
+
 <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4 text-gray-600">
 <div className="flex items-center space-x-1">
 <SafeIcon icon={FiMapPin} className="text-sm flex-shrink-0" />
@@ -215,10 +263,24 @@ Airtable連携
 </span>
 </div>
 )}
-{property.area && (
+{/* 沿線情報を追加 */}
+{property.trainLines && property.trainLines.length > 0 && (
 <div className="flex items-center space-x-1">
-<SafeIcon icon={FiSquare} className="text-sm flex-shrink-0" />
-<span className="text-xs sm:text-sm whitespace-nowrap">{formatNumberOnly(property.area)}㎡</span>
+<SafeIcon icon={FiTrain} className="text-sm flex-shrink-0" />
+<span className="text-xs sm:text-sm whitespace-nowrap">
+{property.trainLines[0].replace('東京メトロ','メトロ').replace('JR','')}
+{property.trainLines.length > 1 && ` 他${property.trainLines.length-1}路線`}
+</span>
+</div>
+)}
+{/* 建物構造情報を追加 */}
+{property.details.buildingConstruction && (
+<div className="flex items-center space-x-1">
+<SafeIcon icon={FiBuilding} className="text-sm flex-shrink-0" />
+<span className="text-xs sm:text-sm whitespace-nowrap">
+{property.details.buildingConstruction}
+{property.details.currentFloor && ` ${property.details.currentFloor}`}
+</span>
 </div>
 )}
 <div className="flex items-center space-x-1">
@@ -240,29 +302,21 @@ Airtable連携
 </div>
 </div>
 
-{/* Price Information - 敷金を削除 */}
-{property.rent && (
-<div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg p-4 sm:p-6">
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+{/* Price Information - シンプル化（賃料と面積のみ） */}
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 <div>
 <h3 className="text-sm font-medium text-gray-700 mb-1">賃料</h3>
 <div className="text-xl sm:text-2xl font-bold text-primary-600">
 {formatPrice(property.rent)}<span className="text-sm text-gray-500">/月</span>
 </div>
-{property.details.rentManYen && (
-<div className="text-sm text-gray-500">
-{formatNumberOnly(property.details.rentManYen)}万円
-{property.details.rentTax > 0 && ` (税込)`}
-</div>
-)}
 </div>
 
 {/* 使用部分面積を表示 */}
-{property.details.usageArea && (
+{hasValue(property.details.usageArea) && (
 <div>
 <h3 className="text-sm font-medium text-gray-700 mb-1">使用部分面積</h3>
 <div className="text-lg font-semibold text-gray-900">
-{formatNumberOnly(property.details.usageArea)}<span className="text-sm text-gray-500">㎡</span>
+{formatArea(property.details.usageArea)}<span className="text-sm text-gray-500">㎡</span>
 </div>
 </div>
 )}
@@ -277,7 +331,6 @@ Airtable連携
 )}
 </div>
 )}
-</div>
 
 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
 {/* Main Content */}
@@ -288,8 +341,8 @@ Airtable連携
 <div className="relative">
 {/* メイン画像コンテナ - レスポンシブ高さ */}
 <div className="relative w-full h-64 sm:h-80 md:h-96 lg:h-[500px] bg-gray-200 overflow-hidden">
-<img
-src={property.images[currentImageIndex]}
+<img 
+src={property.images[currentImageIndex]} 
 alt={property.title}
 className="w-full h-full object-contain cursor-pointer"
 onClick={()=> setShowImageModal(true)}
@@ -342,13 +395,13 @@ className="absolute bottom-2 sm:bottom-4 right-2 sm:right-4 bg-black bg-opacity-
 key={index}
 onClick={()=> setCurrentImageIndex(index)}
 className={`flex-shrink-0 w-16 h-12 sm:w-20 sm:h-16 rounded-md overflow-hidden border-2 transition-all ${
-index===currentImageIndex
-? 'border-primary-600 shadow-md'
+index===currentImageIndex 
+? 'border-primary-600 shadow-md' 
 : 'border-gray-200 hover:border-gray-300'
 }`}
 >
-<img
-src={image}
+<img 
+src={image} 
 alt={`${property.title} ${index + 1}`}
 className="w-full h-full object-cover"
 onError={(e)=> {
@@ -363,20 +416,15 @@ e.target.style.display='none';
 </div>
 )}
 
-{/* Property Information Tabs */}
+{/* Property Information - 統合されたタブ */}
 <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-{/* Tab Navigation - スマホ対応 */}
-<div className="border-b border-gray-200 overflow-x-auto">
-<nav className="flex space-x-4 sm:space-x-8 px-4 sm:px-6 min-w-max">
+{/* Tab Navigation - 物件概要のみ */}
+<div className="border-b border-gray-200">
+<nav className="flex px-4 sm:px-6">
 {tabs.map((tab)=> (
 <button
 key={tab.id}
-onClick={()=> setActiveTab(tab.id)}
-className={`py-3 sm:py-4 px-1 sm:px-2 border-b-2 font-medium text-xs sm:text-sm flex items-center space-x-1 sm:space-x-2 transition-colors whitespace-nowrap ${
-activeTab===tab.id
-? 'border-primary-600 text-primary-600'
-: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-}`}
+className="py-3 sm:py-4 px-1 sm:px-2 border-b-2 border-primary-600 font-medium text-xs sm:text-sm flex items-center space-x-1 sm:space-x-2 text-primary-600"
 >
 <SafeIcon icon={tab.icon} className="text-xs sm:text-sm" />
 <span>{tab.label}</span>
@@ -385,110 +433,49 @@ activeTab===tab.id
 </nav>
 </div>
 
-{/* Tab Content */}
-<div className="p-4 sm:p-6">
-{activeTab==='overview' && (
-<div className="space-y-4 sm:space-y-6">
-{property.equipment && (
+{/* 統合されたコンテンツ */}
+<div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
+{/* 基本情報セクション */}
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">設備・条件</h3>
-<p className="text-sm sm:text-base text-gray-700 leading-relaxed">
-{property.equipment}
-</p>
-</div>
-)}
-
-{property.notes && (
-<div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">備考</h3>
-<div className="text-sm sm:text-base text-gray-700 leading-relaxed whitespace-pre-line">
-{property.notes}
-</div>
-</div>
-)}
-
-{/* Location Map */}
-{property.coordinates && (
-<div>
-<div className="flex items-center justify-between mb-3">
-<h3 className="text-base sm:text-lg font-semibold text-gray-900">所在地</h3>
-<button
-onClick={()=> setShowMapModal(true)}
-className="flex items-center space-x-1 text-primary-600 hover:text-primary-700 text-xs sm:text-sm font-medium"
->
-<SafeIcon icon={FiMaximize2} className="text-xs" />
-<span>大きな地図で見る</span>
-</button>
-</div>
-<div className="relative bg-gray-100 rounded-lg overflow-hidden h-48 sm:h-64 md:h-80">
-<PropertyMap
-properties={[property]}
-selectedProperty={property}
-center={property.coordinates}
-zoom={16}
-/>
-</div>
-<div className="mt-3 p-3 bg-gray-50 rounded-lg">
-<div className="flex items-center space-x-2 text-gray-600 mb-1">
-<SafeIcon icon={FiMapPin} className="text-sm flex-shrink-0" />
-<span className="text-sm font-medium">住所</span>
-</div>
-<p className="text-sm sm:text-base text-gray-900 break-all">{property.address}</p>
-{property.nearestStation && (
-<div className="flex items-center space-x-2 text-gray-600 mt-2">
-<SafeIcon icon={FiNavigation} className="text-sm flex-shrink-0" />
-<span className="text-sm">
-{property.nearestStation}駅
-{property.walkingMinutes && ` から徒歩${property.walkingMinutes}分`}
-</span>
-</div>
-)}
-</div>
-</div>
-)}
-</div>
-)}
-
-{activeTab==='details' && (
-<div className="space-y-4 sm:space-y-6">
-{/* Basic Details */}
-<div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">基本情報</h3>
-<div className="grid grid-cols-1 gap-3 sm:gap-4">
-{property.details.propertyNumber && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+<SafeIcon icon={FiHome} className="text-blue-600" />
+<span>基本情報</span>
+</h3>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+{hasValue(property.details.propertyNumber) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">物件番号</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.details.propertyNumber}</span>
+<span className="text-base text-gray-900">{property.details.propertyNumber}</span>
 </div>
 )}
-{property.details.propertyType && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.details.propertyType) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">物件種目</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.details.propertyType}</span>
+<span className="text-base text-gray-900">{property.details.propertyType}</span>
 </div>
 )}
-{property.details.usageArea && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.details.usageArea) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">使用部分面積</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{formatNumberOnly(property.details.usageArea)}㎡</span>
+<span className="text-base text-gray-900">{formatArea(property.details.usageArea)}㎡</span>
 </div>
 )}
-{property.details.buildingConstruction && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.details.buildingConstruction) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">建物構造</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.details.buildingConstruction}</span>
+<span className="text-base text-gray-900">{property.details.buildingConstruction}</span>
 </div>
 )}
-{property.details.currentFloor && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.details.currentFloor) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">所在階</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.details.currentFloor}</span>
+<span className="text-base text-gray-900">{property.details.currentFloor}</span>
 </div>
 )}
-{property.buildYear && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.buildYear) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">築年数</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">
+<span className="text-base text-gray-900">
 {property.buildingAge ? `築${property.buildingAge}年` : `${property.buildYear}年築`}
 </span>
 </div>
@@ -496,56 +483,64 @@ zoom={16}
 </div>
 </div>
 
-{/* Rent Details - 敷金を削除 */}
+{/* 賃料詳細セクション */}
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">賃料詳細</h3>
-<div className="grid grid-cols-1 gap-3 sm:gap-4">
-{property.details.rentManYen && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+<SafeIcon icon={FiDollarSign} className="text-green-600" />
+<span>賃料詳細</span>
+</h3>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+{hasValue(property.details.rentManYen) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">賃料</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{formatNumberOnly(property.details.rentManYen)}万円</span>
+<span className="text-base text-gray-900 font-semibold">{formatManYen(property.details.rentManYen)}</span>
 </div>
 )}
-{property.details.sqmPrice && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.details.sqmPrice) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">㎡単価</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">¥{formatNumberOnly(property.details.sqmPrice)}</span>
+<span className="text-base text-gray-900">¥{formatNumberOnly(property.details.sqmPrice)}</span>
 </div>
 )}
-{property.details.keyMoney && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.details.keyMoney) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">礼金</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{formatNumberOnly(property.details.keyMoney)}万円</span>
+<span className="text-base text-gray-900">{formatManYen(property.details.keyMoney)}</span>
 </div>
 )}
-{property.details.managementFeeAmount && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.details.managementFeeAmount) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">管理費</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{formatNumberOnly(property.details.managementFeeAmount)}万円</span>
+<span className="text-base text-gray-900">{formatManYen(property.details.managementFeeAmount)}</span>
 </div>
 )}
-{property.details.contractPeriod && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+{hasValue(property.details.contractPeriod) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">契約期間</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.details.contractPeriod}</span>
+<span className="text-base text-gray-900">{property.details.contractPeriod}</span>
+</div>
+)}
+{hasValue(property.details.guaranteeDeposit) && (
+<div className="flex flex-col space-y-1">
+<span className="text-sm text-gray-600 font-medium">保証金</span>
+<span className="text-base text-gray-900">{formatManYen(property.details.guaranteeDeposit)}</span>
 </div>
 )}
 </div>
 </div>
-</div>
-)}
 
-{activeTab==='location' && (
-<div className="space-y-4 sm:space-y-6">
-{/* Transportation */}
+{/* 交通アクセスセクション */}
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">交通アクセス</h3>
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+<SafeIcon icon={FiNavigation} className="text-blue-600" />
+<span>交通アクセス</span>
+</h3>
 <div className="space-y-3">
 {property.trainLines && property.trainLines.map((line,index)=> (
-<div key={index} className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 p-3 bg-gray-50 rounded">
+<div key={index} className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
 <div className="flex items-center space-x-2">
-<SafeIcon icon={FiNavigation} className="text-blue-600 flex-shrink-0" />
-<span className="font-medium text-sm sm:text-base">{line}</span>
+<SafeIcon icon={FiTrain} className="text-blue-600 flex-shrink-0" />
+<span className="font-medium text-base">{line}</span>
 </div>
 {property.nearestStation && index===0 && (
 <span className="text-sm text-gray-600">
@@ -558,98 +553,187 @@ zoom={16}
 </div>
 </div>
 
-{/* Address Details */}
+{/* 所在地詳細セクション */}
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">所在地詳細</h3>
-<div className="space-y-2">
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+<SafeIcon icon={FiMapPin} className="text-red-600" />
+<span>所在地詳細</span>
+</h3>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+{hasValue(property.prefecture) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">都道府県</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.prefecture}</span>
+<span className="text-base text-gray-900">{property.prefecture}</span>
 </div>
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-start p-3 bg-gray-50 rounded">
+)}
+{hasValue(property.address) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">住所</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0 break-all text-right">{property.address}</span>
+<span className="text-base text-gray-900 break-all">{property.address}</span>
 </div>
-{property.buildingName && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+)}
+{hasValue(property.buildingName) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">建物名</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.buildingName}</span>
+<span className="text-base text-gray-900">{property.buildingName}</span>
 </div>
 )}
 </div>
 </div>
-</div>
-)}
 
-{activeTab==='equipment' && (
-<div className="space-y-4 sm:space-y-6">
-{/* Equipment & Conditions */}
-{property.details.equipmentConditions && (
+{/* 設備・条件セクション */}
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">設備・条件</h3>
-<p className="text-sm sm:text-base text-gray-700 leading-relaxed">
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+<SafeIcon icon={FiZap} className="text-yellow-600" />
+<span>設備・条件</span>
+</h3>
+<div className="space-y-4">
+{hasValue(property.details.equipmentConditions) && (
+<div>
+<h4 className="text-base font-semibold text-gray-900 mb-2">設備・条件</h4>
+<p className="text-base text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
 {property.details.equipmentConditions}
 </p>
 </div>
 )}
-
-{/* Additional Equipment */}
-{property.details.equipmentFreeSpace && (
+{hasValue(property.details.equipmentFreeSpace) && (
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">設備詳細</h3>
-<p className="text-sm sm:text-base text-gray-700 leading-relaxed">
+<h4 className="text-base font-semibold text-gray-900 mb-2">設備詳細</h4>
+<p className="text-base text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
 {property.details.equipmentFreeSpace}
 </p>
 </div>
 )}
-
-{/* Conditions */}
-{property.details.conditionsFreeSpace && (
+{hasValue(property.details.conditionsFreeSpace) && (
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">条件詳細</h3>
-<p className="text-sm sm:text-base text-gray-700 leading-relaxed">
+<h4 className="text-base font-semibold text-gray-900 mb-2">条件詳細</h4>
+<p className="text-base text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
 {property.details.conditionsFreeSpace}
 </p>
 </div>
 )}
+</div>
+</div>
 
-{/* Parking */}
-{property.details.parkingAvailability && (
+{/* 駐車場・その他費用セクション */}
+{(hasValue(property.details.parkingAvailability) || hasValue(property.details.keyExchangeCategory)) && (
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">駐車場</h3>
-<div className="grid grid-cols-1 gap-3 sm:gap-4">
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+<SafeIcon icon={FiCar} className="text-purple-600" />
+<span>駐車場・その他</span>
+</h3>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+{hasValue(property.details.parkingAvailability) && (
+<div className="flex flex-col space-y-1">
 <span className="text-sm text-gray-600 font-medium">駐車場</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.details.parkingAvailability}</span>
+<span className="text-base text-gray-900">{property.details.parkingAvailability}</span>
+{hasValue(property.details.parkingMonthlyFee) && (
+<span className="text-sm text-gray-600">月額: ¥{formatNumberOnly(property.details.parkingMonthlyFee)}</span>
+)}
 </div>
-{property.details.parkingMonthlyFee > 0 && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
-<span className="text-sm text-gray-600 font-medium">駐車場代</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">¥{formatNumberOnly(property.details.parkingMonthlyFee)}/月</span>
+)}
+{hasValue(property.details.keyExchangeCategory) && (
+<div className="flex flex-col space-y-1">
+<span className="text-sm text-gray-600 font-medium">鍵交換</span>
+<span className="text-base text-gray-900">{property.details.keyExchangeCategory}</span>
+{hasValue(property.details.keyExchangeAmount) && (
+<span className="text-sm text-gray-600">費用: ¥{formatNumberOnly(property.details.keyExchangeAmount)}</span>
+)}
 </div>
 )}
 </div>
 </div>
 )}
 
-{/* Key Exchange */}
-{property.details.keyExchangeCategory && (
+{/* 契約・入居条件セクション */}
 <div>
-<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">鍵交換</h3>
-<div className="grid grid-cols-1 gap-3 sm:gap-4">
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
-<span className="text-sm text-gray-600 font-medium">鍵交換</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">{property.details.keyExchangeCategory}</span>
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+<SafeIcon icon={FiCalendarCheck} className="text-indigo-600" />
+<span>契約・入居条件</span>
+</h3>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+{hasValue(property.details.currentStatus) && (
+<div className="flex flex-col space-y-1">
+<span className="text-sm text-gray-600 font-medium">現況</span>
+<span className="text-base text-gray-900">{property.details.currentStatus}</span>
 </div>
-{property.details.keyExchangeAmount > 0 && (
-<div className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded">
-<span className="text-sm text-gray-600 font-medium">鍵交換代</span>
-<span className="text-sm sm:text-base text-gray-900 mt-1 sm:mt-0">¥{formatNumberOnly(property.details.keyExchangeAmount)}</span>
+)}
+{hasValue(property.details.moveInTiming) && (
+<div className="flex flex-col space-y-1">
+<span className="text-sm text-gray-600 font-medium">入居時期</span>
+<span className="text-base text-gray-900">{property.details.moveInTiming}</span>
+</div>
+)}
+{hasValue(property.details.moveInDate) && (
+<div className="flex flex-col space-y-1">
+<span className="text-sm text-gray-600 font-medium">入居年月</span>
+<span className="text-base text-gray-900">{property.details.moveInDate}</span>
+</div>
+)}
+{hasValue(property.details.insuranceObligation) && (
+<div className="flex flex-col space-y-1">
+<span className="text-sm text-gray-600 font-medium">保険加入義務</span>
+<span className="text-base text-gray-900">{property.details.insuranceObligation}</span>
 </div>
 )}
 </div>
 </div>
+
+{/* 備考セクション */}
+{property.notes && (
+<div>
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+<SafeIcon icon={FiInfo} className="text-gray-600" />
+<span>備考</span>
+</h3>
+<div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+<div className="text-base text-gray-700 leading-relaxed whitespace-pre-line">
+{property.notes}
+</div>
+</div>
+</div>
 )}
+
+{/* 所在地マップ - 完璧なのでそのまま保持 */}
+{property.coordinates && (
+<div>
+<div className="flex items-center justify-between mb-4">
+<h3 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center space-x-2">
+<SafeIcon icon={FiMap} className="text-green-600" />
+<span>所在地マップ</span>
+</h3>
+<button
+onClick={()=> setShowMapModal(true)}
+className="flex items-center space-x-1 text-primary-600 hover:text-primary-700 text-sm font-medium"
+>
+<SafeIcon icon={FiMaximize2} className="text-xs" />
+<span>大きな地図で見る</span>
+</button>
+</div>
+<div className="relative bg-gray-100 rounded-lg overflow-hidden h-64 sm:h-80 md:h-96">
+<PropertyMap 
+properties={[property]}
+selectedProperty={property}
+center={property.coordinates}
+zoom={16}
+/>
+</div>
+<div className="mt-3 p-4 bg-gray-50 rounded-lg">
+<div className="flex items-center space-x-2 text-gray-600 mb-2">
+<SafeIcon icon={FiMapPin} className="text-sm flex-shrink-0" />
+<span className="text-sm font-medium">住所</span>
+</div>
+<p className="text-base text-gray-900 break-all mb-3">{property.address}</p>
+{property.nearestStation && (
+<div className="flex items-center space-x-2 text-gray-600">
+<SafeIcon icon={FiNavigation} className="text-sm flex-shrink-0" />
+<span className="text-sm">
+{property.nearestStation}駅
+{property.walkingMinutes && ` から徒歩${property.walkingMinutes}分`}
+</span>
+</div>
+)}
+</div>
 </div>
 )}
 </div>
@@ -682,6 +766,7 @@ className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring
 <option value="other">その他</option>
 </select>
 </div>
+
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">
 お名前 *
@@ -696,6 +781,7 @@ className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring
 placeholder="山田 太郎"
 />
 </div>
+
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">
 メールアドレス *
@@ -710,6 +796,7 @@ className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring
 placeholder="example@email.com"
 />
 </div>
+
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">
 電話番号
@@ -723,6 +810,7 @@ className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring
 placeholder="03-1234-5678"
 />
 </div>
+
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">
 お問い合わせ内容
@@ -736,6 +824,7 @@ className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring
 placeholder="ご質問やご要望をお聞かせください"
 />
 </div>
+
 <button
 type="submit"
 className="w-full bg-primary-600 text-white py-2 sm:py-3 rounded-md font-medium text-sm sm:text-base hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
@@ -762,7 +851,7 @@ className="w-full bg-primary-600 text-white py-2 sm:py-3 rounded-md font-medium 
 </div>
 
 {/* Property Info */}
-{property.details.propertyNumber && (
+{hasValue(property.details.propertyNumber) && (
 <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
 <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">物件情報</h3>
 <div className="space-y-3">
@@ -790,8 +879,8 @@ className="w-full bg-primary-600 text-white py-2 sm:py-3 rounded-md font-medium 
 {showImageModal && property.images && property.images.length > 0 && (
 <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4">
 <div className="relative max-w-7xl max-h-full">
-<img
-src={property.images[currentImageIndex]}
+<img 
+src={property.images[currentImageIndex]} 
 alt={property.title}
 className="max-w-full max-h-full object-contain"
 onError={(e)=> {
@@ -844,7 +933,7 @@ className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
 </button>
 </div>
 <div className="h-full">
-<PropertyMap
+<PropertyMap 
 properties={[property]}
 selectedProperty={property}
 center={property.coordinates}
