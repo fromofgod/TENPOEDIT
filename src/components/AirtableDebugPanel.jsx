@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
-import { validateAirtableConnection } from '../services/airtableService';
+import {validateAirtableConnection} from '../services/airtableService';
 
-const { FiDatabase, FiCheck, FiX, FiRefreshCw, FiInfo, FiImage } = FiIcons;
+const {FiDatabase, FiCheck, FiX, FiRefreshCw, FiInfo, FiImage, FiAlertTriangle, FiWifi, FiClock} = FiIcons;
 
-const AirtableDebugPanel = ({ properties, stats }) => {
+const AirtableDebugPanel = ({properties, stats}) => {
   const [connectionStatus, setConnectionStatus] = useState('testing');
   const [connectionInfo, setConnectionInfo] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [lastTestTime, setLastTestTime] = useState(null);
 
   useEffect(() => {
     testConnection();
@@ -17,15 +18,20 @@ const AirtableDebugPanel = ({ properties, stats }) => {
   const testConnection = async () => {
     setConnectionStatus('testing');
     try {
+      console.log('🔧 Testing Airtable connection...');
       const result = await validateAirtableConnection();
       setConnectionInfo(result);
       setConnectionStatus(result.success ? 'connected' : 'error');
+      setLastTestTime(new Date());
+      
+      console.log('🔧 Connection test result:', result);
     } catch (error) {
       setConnectionStatus('error');
       setConnectionInfo({
         success: false,
         error: error.message
       });
+      setLastTestTime(new Date());
     }
   };
 
@@ -55,9 +61,8 @@ const AirtableDebugPanel = ({ properties, stats }) => {
       p.images && p.images.some(img => !img.includes('unsplash.com'))
     ).length,
     totalImages: properties.reduce((sum, p) => sum + (p.images?.length || 0), 0),
-    averageImages: properties.length > 0 
-      ? Math.round(properties.reduce((sum, p) => sum + (p.images?.length || 0), 0) / properties.length * 10) / 10 
-      : 0
+    averageImages: properties.length > 0 ? 
+      Math.round(properties.reduce((sum, p) => sum + (p.images?.length || 0), 0) / properties.length * 10) / 10 : 0
   } : null;
 
   return (
@@ -84,7 +89,9 @@ const AirtableDebugPanel = ({ properties, stats }) => {
           )}
           <SafeIcon 
             icon={FiInfo} 
-            className={`text-gray-400 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+            className={`text-gray-400 transform transition-transform ${
+              isExpanded ? 'rotate-180' : ''
+            }`} 
           />
         </div>
 
@@ -94,15 +101,37 @@ const AirtableDebugPanel = ({ properties, stats }) => {
             <div className="space-y-3 mt-3">
               {/* Connection Status */}
               <div>
-                <h4 className="text-xs font-medium text-gray-700 mb-1">接続状況</h4>
+                <h4 className="text-xs font-medium text-gray-700 mb-1 flex items-center space-x-1">
+                  <SafeIcon icon={FiWifi} className="text-xs" />
+                  <span>接続状況</span>
+                </h4>
                 <div className="text-xs text-gray-600">
-                  <div>状態: {connectionStatus}</div>
+                  <div className="flex items-center justify-between">
+                    <span>状態:</span>
+                    <span className={`font-medium ${
+                      connectionStatus === 'connected' ? 'text-green-600' :
+                      connectionStatus === 'error' ? 'text-red-600' : 'text-yellow-600'
+                    }`}>
+                      {connectionStatus === 'connected' ? '接続中' :
+                       connectionStatus === 'error' ? 'エラー' : 'テスト中'}
+                    </span>
+                  </div>
+                  {lastTestTime && (
+                    <div className="flex items-center justify-between mt-1">
+                      <span>最終テスト:</span>
+                      <span className="text-gray-500">
+                        {lastTestTime.toLocaleTimeString('ja-JP')}
+                      </span>
+                    </div>
+                  )}
                   {connectionInfo && (
                     <>
                       {connectionInfo.success ? (
-                        <div className="text-green-600">✅ 接続成功</div>
+                        <div className="text-green-600 mt-1">✅ 接続成功</div>
                       ) : (
-                        <div className="text-red-600">❌ {connectionInfo.error}</div>
+                        <div className="text-red-600 mt-1 break-words">
+                          ❌ {connectionInfo.error}
+                        </div>
                       )}
                     </>
                   )}
@@ -111,14 +140,29 @@ const AirtableDebugPanel = ({ properties, stats }) => {
 
               {/* Data Stats */}
               <div>
-                <h4 className="text-xs font-medium text-gray-700 mb-1">データ統計</h4>
+                <h4 className="text-xs font-medium text-gray-700 mb-1 flex items-center space-x-1">
+                  <SafeIcon icon={FiDatabase} className="text-xs" />
+                  <span>データ統計</span>
+                </h4>
                 <div className="text-xs text-gray-600 space-y-1">
-                  <div>総物件数: {properties?.length || 0}</div>
-                  <div>座標あり: {properties?.filter(p => p.coordinates).length || 0}</div>
+                  <div className="flex justify-between">
+                    <span>総物件数:</span>
+                    <span className="font-medium">{properties?.length || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>座標あり:</span>
+                    <span className="font-medium">{properties?.filter(p => p.coordinates).length || 0}</span>
+                  </div>
                   {stats && (
                     <>
-                      <div>平均賃料: ¥{stats.averageRent?.toLocaleString()}</div>
-                      <div>対応エリア: {Object.keys(stats.byWard || {}).length}</div>
+                      <div className="flex justify-between">
+                        <span>平均賃料:</span>
+                        <span className="font-medium">¥{stats.averageRent?.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>対応エリア:</span>
+                        <span className="font-medium">{Object.keys(stats.byWard || {}).length}</span>
+                      </div>
                     </>
                   )}
                 </div>
@@ -132,10 +176,24 @@ const AirtableDebugPanel = ({ properties, stats }) => {
                     <span>画像統計</span>
                   </h4>
                   <div className="text-xs text-gray-600 space-y-1">
-                    <div>総画像数: {imageStats.totalImages}枚</div>
-                    <div>平均画像数: {imageStats.averageImages}枚/物件</div>
-                    <div>実写画像あり: {imageStats.withRealImages}件</div>
-                    <div>画像なし: {imageStats.total - imageStats.withImages}件</div>
+                    <div className="flex justify-between">
+                      <span>総画像数:</span>
+                      <span className="font-medium">{imageStats.totalImages}枚</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>平均画像数:</span>
+                      <span className="font-medium">{imageStats.averageImages}枚/物件</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>実写画像あり:</span>
+                      <span className="font-medium text-blue-600">{imageStats.withRealImages}件</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>画像なし:</span>
+                      <span className="font-medium text-orange-600">
+                        {imageStats.total - imageStats.withImages}件
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -174,17 +232,44 @@ const AirtableDebugPanel = ({ properties, stats }) => {
                 </div>
               )}
 
+              {/* Missing Fields Warning */}
+              {connectionInfo?.missingFields && connectionInfo.missingFields.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-medium text-gray-700 mb-1 flex items-center space-x-1">
+                    <SafeIcon icon={FiAlertTriangle} className="text-xs text-orange-500" />
+                    <span>不足フィールド</span>
+                  </h4>
+                  <div className="text-xs text-orange-600 max-h-16 overflow-y-auto">
+                    {connectionInfo.missingFields.slice(0, 3).map((field, index) => (
+                      <div key={index}>• {field}</div>
+                    ))}
+                    {connectionInfo.missingFields.length > 3 && (
+                      <div className="text-orange-400">...他{connectionInfo.missingFields.length - 3}個</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Performance Info */}
+              <div className="border-t border-gray-200 pt-2">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>同期間隔:</span>
+                  <span>5分</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>タイムアウト:</span>
+                  <span>30秒</span>
+                </div>
+              </div>
+
               {/* Refresh Button */}
               <button
                 onClick={testConnection}
                 disabled={connectionStatus === 'testing'}
-                className="w-full px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                className="w-full px-3 py-2 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center space-x-1"
               >
-                <SafeIcon 
-                  icon={FiRefreshCw} 
-                  className={`mr-1 ${connectionStatus === 'testing' ? 'animate-spin' : ''}`} 
-                />
-                再テスト
+                <SafeIcon icon={FiRefreshCw} className={`${connectionStatus === 'testing' ? 'animate-spin' : ''}`} />
+                <span>再テスト</span>
               </button>
             </div>
           </div>
