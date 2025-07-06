@@ -3,7 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import {validateAirtableConnection} from '../services/airtableService';
 
-const {FiDatabase, FiCheck, FiX, FiRefreshCw, FiInfo, FiImage, FiAlertTriangle, FiWifi, FiClock} = FiIcons;
+const {FiDatabase, FiCheck, FiX, FiRefreshCw, FiInfo, FiImage, FiAlertTriangle, FiWifi, FiClock, FiEye, FiExternalLink} = FiIcons;
 
 const AirtableDebugPanel = ({properties, stats}) => {
   const [connectionStatus, setConnectionStatus] = useState('testing');
@@ -99,6 +99,35 @@ const AirtableDebugPanel = ({properties, stats}) => {
         {isExpanded && (
           <div className="px-3 pb-3 border-t border-gray-200">
             <div className="space-y-3 mt-3">
+              {/* View Information */}
+              {connectionInfo?.viewId && (
+                <div>
+                  <h4 className="text-xs font-medium text-gray-700 mb-1 flex items-center space-x-1">
+                    <SafeIcon icon={FiEye} className="text-xs" />
+                    <span>使用ビュー</span>
+                  </h4>
+                  <div className="text-xs text-gray-600">
+                    <div className="flex items-center justify-between">
+                      <span>View ID:</span>
+                      <span className="font-mono text-xs">{connectionInfo.viewId}</span>
+                    </div>
+                    {connectionInfo.viewUrl && (
+                      <div className="mt-1">
+                        <a 
+                          href={connectionInfo.viewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700 text-xs flex items-center space-x-1"
+                        >
+                          <span>Airtableで開く</span>
+                          <SafeIcon icon={FiExternalLink} className="text-xs" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Connection Status */}
               <div>
                 <h4 className="text-xs font-medium text-gray-700 mb-1 flex items-center space-x-1">
@@ -127,7 +156,7 @@ const AirtableDebugPanel = ({properties, stats}) => {
                   {connectionInfo && (
                     <>
                       {connectionInfo.success ? (
-                        <div className="text-green-600 mt-1">✅ 接続成功</div>
+                        <div className="text-green-600 mt-1">✅ ビュー接続成功</div>
                       ) : (
                         <div className="text-red-600 mt-1 break-words">
                           ❌ {connectionInfo.error}
@@ -151,7 +180,15 @@ const AirtableDebugPanel = ({properties, stats}) => {
                   </div>
                   <div className="flex justify-between">
                     <span>座標あり:</span>
-                    <span className="font-medium">{properties?.filter(p => p.coordinates).length || 0}</span>
+                    <span className="font-medium text-blue-600">
+                      {properties?.filter(p => p.coordinates).length || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>利用可能:</span>
+                    <span className="font-medium text-green-600">
+                      {properties?.filter(p => p.isAvailable).length || 0}
+                    </span>
                   </div>
                   {stats && (
                     <>
@@ -198,36 +235,27 @@ const AirtableDebugPanel = ({properties, stats}) => {
                 </div>
               )}
 
-              {/* Available Fields */}
-              {connectionInfo?.fields && (
+              {/* Field Analysis */}
+              {connectionInfo?.fieldAnalysis && (
                 <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-1">利用可能フィールド</h4>
-                  <div className="text-xs text-gray-600 max-h-20 overflow-y-auto">
-                    {connectionInfo.fields.slice(0, 5).map((field, index) => (
-                      <div key={index}>• {field}</div>
-                    ))}
-                    {connectionInfo.fields.length > 5 && (
-                      <div className="text-gray-400">...他{connectionInfo.fields.length - 5}個</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Image Fields */}
-              {connectionInfo?.imageFields && (
-                <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-1 flex items-center space-x-1">
-                    <SafeIcon icon={FiImage} className="text-xs" />
-                    <span>画像フィールド</span>
-                  </h4>
-                  <div className="text-xs text-gray-600 max-h-16 overflow-y-auto">
-                    {connectionInfo.imageFields.length > 0 ? (
-                      connectionInfo.imageFields.map((field, index) => (
-                        <div key={index} className="text-blue-600">• {field}</div>
-                      ))
-                    ) : (
-                      <div className="text-orange-600">画像フィールドが見つかりません</div>
-                    )}
+                  <h4 className="text-xs font-medium text-gray-700 mb-1">フィールド分析</h4>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div className="flex justify-between">
+                      <span>基本情報:</span>
+                      <span className="font-medium">{connectionInfo.fieldAnalysis.basicInfo?.length || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>価格情報:</span>
+                      <span className="font-medium">{connectionInfo.fieldAnalysis.priceInfo?.length || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>位置情報:</span>
+                      <span className="font-medium">{connectionInfo.fieldAnalysis.locationInfo?.length || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>画像情報:</span>
+                      <span className="font-medium">{connectionInfo.fieldAnalysis.imageInfo?.length || 0}</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -258,7 +286,16 @@ const AirtableDebugPanel = ({properties, stats}) => {
                 </div>
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <span>タイムアウト:</span>
-                  <span>30秒</span>
+                  <span>45秒</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>データ品質:</span>
+                  <span className="text-green-600">
+                    {properties && properties.length > 0 ? 
+                      `${Math.round(properties.filter(p => p.coordinates).length / properties.length * 100)}%` : 
+                      '0%'
+                    }
+                  </span>
                 </div>
               </div>
 

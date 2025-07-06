@@ -6,9 +6,18 @@ const AIRTABLE_API_KEY = import.meta.env.VITE_AIRTABLE_API_KEY || 'patxWbNWEvvGN
 const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID || 'appBFYfgbWNZyP0QR';
 const AIRTABLE_TABLE_NAME = import.meta.env.VITE_AIRTABLE_TABLE_NAME || 'Reins';
 
+// 複数のビューIDを試す（Grid viewをデフォルトとして使用）
+const POSSIBLE_VIEW_IDS = [
+  'shrKoKZIuYxzEI6K4', // 提供されたビューID
+  'viwGridView',        // 一般的なGrid view ID
+  'Grid view',          // ビュー名での指定
+  null                  // ビュー指定なし（デフォルトビュー使用）
+];
+
 console.log('🔧 Airtable Configuration:', {
   baseId: AIRTABLE_BASE_ID,
   tableName: AIRTABLE_TABLE_NAME,
+  possibleViews: POSSIBLE_VIEW_IDS,
   hasApiKey: !!AIRTABLE_API_KEY,
   keyPrefix: AIRTABLE_API_KEY ? AIRTABLE_API_KEY.substring(0, 10) + '...' : 'No API Key'
 });
@@ -19,10 +28,10 @@ const airtableClient = axios.create({
     'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30秒のタイムアウト
+  timeout: 45000,
 });
 
-// リクエストインターセプター（デバッグ用）
+// リクエストインターセプター
 airtableClient.interceptors.request.use(
   (config) => {
     console.log('🔗 Airtable Request:', {
@@ -39,7 +48,7 @@ airtableClient.interceptors.request.use(
   }
 );
 
-// レスポンスインターセプター（デバッグ用）
+// レスポンスインターセプター
 airtableClient.interceptors.response.use(
   (response) => {
     console.log('✅ Airtable Response:', {
@@ -61,544 +70,431 @@ airtableClient.interceptors.response.use(
   }
 );
 
-// 接続テスト関数（改善版）
+// 複数のビューを順次試す関数
+const tryMultipleViews = async (operation) => {
+  let lastError = null;
+  
+  for (const viewId of POSSIBLE_VIEW_IDS) {
+    try {
+      console.log(`🔍 Trying view: ${viewId || 'Default view'}`);
+      
+      const params = {
+        maxRecords: 10 // テスト用に少数で試す
+      };
+      
+      if (viewId) {
+        params.view = viewId;
+      }
+      
+      const result = await operation(params);
+      
+      if (result.data.records && result.data.records.length > 0) {
+        console.log(`✅ Success with view: ${viewId || 'Default view'} (${result.data.records.length} records)`);
+        return { success: true, viewId, result };
+      } else {
+        console.log(`⚠️ View "${viewId || 'Default view'}" returned 0 records`);
+      }
+      
+    } catch (error) {
+      console.log(`❌ Failed with view "${viewId || 'Default view'}":`, error.message);
+      lastError = error;
+    }
+  }
+  
+  // すべてのビューで失敗した場合
+  throw new Error(`All views failed. Last error: ${lastError?.message}`);
+};
+
+// 接続テスト関数（複数ビューを試行）
 export const validateAirtableConnection = async () => {
   try {
-    console.log('🔧 Testing Airtable connection...');
+    console.log('🔧 Testing Airtable connection with multiple views...');
     
-    // まずベースの情報を取得
-    const testResponse = await airtableClient.get(`/${AIRTABLE_TABLE_NAME}`, {
-      params: {
-        maxRecords: 1,
-        view: 'Grid view'
-      }
+    const connectionResult = await tryMultipleViews(async (params) => {
+      return await airtableClient.get(`/${AIRTABLE_TABLE_NAME}`, { params });
     });
-
-    const fields = testResponse.data.records[0]?.fields || {};
-    const availableFields = Object.keys(fields);
     
-    // 画像フィールドの確認
-    const imageFields = [];
-    for (let i = 1; i <= 9; i++) {
-      if (fields[`画像${i}`]) {
-        imageFields.push(`画像${i}`);
-      }
+    const records = connectionResult.result.data.records || [];
+    const workingViewId = connectionResult.viewId;
+    
+    console.log('📊 Connection test results:', {
+      workingView: workingViewId || 'Default view',
+      recordCount: records.length
+    });
+    
+    if (records.length === 0) {
+      return {
+        success: false,
+        error: 'All views returned 0 records. The table may be empty or have restrictive filters.',
+        testedViews: POSSIBLE_VIEW_IDS
+      };
     }
 
-    // 重要フィールドの確認
-    const importantFields = [
-      '物件タイトル', '物件名', '住所', '都道府県名', '所在地名１', 
-      '賃料（万円）', '使用部分面積', '面積', '沿線名', '駅名',
-      'Latitude', 'Longitude'
-    ];
+    // 最初のレコードの詳細分析
+    const firstRecord = records[0];
+    const fields = firstRecord?.fields || {};
+    const availableFields = Object.keys(fields);
     
-    const missingFields = importantFields.filter(field => !availableFields.includes(field));
-    const presentFields = importantFields.filter(field => availableFields.includes(field));
-
-    console.log('✅ Connection test successful:', {
-      totalFields: availableFields.length,
-      imageFields: imageFields.length,
-      presentImportantFields: presentFields.length,
-      missingImportantFields: missingFields.length
+    console.log('🔍 DETAILED FIELD ANALYSIS:');
+    console.log('📋 Total fields found:', availableFields.length);
+    console.log('📋 All available fields:', availableFields);
+    
+    // 各フィールドの値と型を表示
+    console.log('📊 FIELD VALUES AND TYPES:');
+    availableFields.forEach(fieldName => {
+      const value = fields[fieldName];
+      const type = typeof value;
+      const isArray = Array.isArray(value);
+      const hasUrl = isArray && value.length > 0 && value[0]?.url;
+      
+      console.log(`  ${fieldName}:`, {
+        type: type,
+        isArray: isArray,
+        hasUrl: hasUrl,
+        value: isArray ? `Array(${value.length})` : type === 'string' ? value.substring(0, 50) + (value.length > 50 ? '...' : '') : value
+      });
     });
+
+    // 画像フィールドの検出
+    const imageFields = availableFields.filter(field => {
+      const value = fields[field];
+      return Array.isArray(value) && value.length > 0 && value[0]?.url;
+    });
+    
+    console.log('🖼️ Image fields detected:', imageFields);
+
+    // 重要フィールドの自動検出（より幅広いパターン）
+    const fieldDetection = {
+      title: availableFields.filter(f => 
+        /title|name|物件|タイトル|名前|property.*name/i.test(f)
+      ),
+      address: availableFields.filter(f => 
+        /address|住所|所在地|location|場所/i.test(f)
+      ),
+      rent: availableFields.filter(f => 
+        /rent|賃料|家賃|price|料金|金額/i.test(f)
+      ),
+      area: availableFields.filter(f => 
+        /area|面積|size|広さ|坪|㎡|平米/i.test(f)
+      ),
+      station: availableFields.filter(f => 
+        /station|駅|最寄|nearest/i.test(f)
+      ),
+      type: availableFields.filter(f => 
+        /type|種別|用途|category|カテゴリ|業種/i.test(f)
+      ),
+      coordinates: availableFields.filter(f => 
+        /lat|lng|lon|緯度|経度|coordinate|gps/i.test(f)
+      )
+    };
+
+    console.log('🎯 Field detection results:', fieldDetection);
+
+    // データ品質チェック
+    const dataQuality = {
+      totalFields: availableFields.length,
+      textFields: availableFields.filter(f => typeof fields[f] === 'string').length,
+      numberFields: availableFields.filter(f => typeof fields[f] === 'number').length,
+      arrayFields: availableFields.filter(f => Array.isArray(fields[f])).length,
+      imageFields: imageFields.length,
+      emptyFields: availableFields.filter(f => !fields[f] || fields[f] === '').length
+    };
+
+    console.log('📊 Data quality analysis:', dataQuality);
 
     return {
       success: true,
-      recordCount: testResponse.data.records.length,
+      workingViewId: workingViewId,
+      recordCount: records.length,
       fields: availableFields,
+      fieldDetection,
+      dataQuality,
+      sampleData: fields,
       imageFields,
-      presentFields,
-      missingFields,
-      sampleData: fields
+      rawRecord: firstRecord
     };
 
   } catch (error) {
-    console.error('❌ Airtable connection test failed:', error);
+    console.error('❌ All Airtable connection attempts failed:', error);
     
-    let errorMessage = 'Unknown error';
-    if (error.response) {
-      switch (error.response.status) {
-        case 401:
-          errorMessage = 'API key is invalid or expired';
-          break;
-        case 403:
-          errorMessage = 'Access forbidden - check permissions';
-          break;
-        case 404:
-          errorMessage = `Table "${AIRTABLE_TABLE_NAME}" not found in base "${AIRTABLE_BASE_ID}"`;
-          break;
-        case 422:
-          errorMessage = 'Invalid request parameters';
-          break;
-        default:
-          errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
-      }
-    } else if (error.code === 'ENOTFOUND') {
-      errorMessage = 'Network connection failed';
-    } else if (error.code === 'TIMEOUT') {
-      errorMessage = 'Request timeout - Airtable may be slow';
-    } else {
-      errorMessage = error.message;
-    }
-
     return {
       success: false,
-      error: errorMessage,
+      error: error.message,
+      testedViews: POSSIBLE_VIEW_IDS,
       details: {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        code: error.code
+        apiKey: AIRTABLE_API_KEY ? 'Present' : 'Missing',
+        baseId: AIRTABLE_BASE_ID,
+        tableName: AIRTABLE_TABLE_NAME
       }
     };
   }
 };
 
-// 画像URLをパース（画像2を最初に配置）
-const parseImages = (record) => {
-  console.log('🖼️ Parsing images from record:', record.id);
-  const images = [];
-
-  // 画像2を最初にチェック
-  const image2Field = record.fields['画像2'];
-  if (image2Field && Array.isArray(image2Field) && image2Field.length > 0) {
-    image2Field.forEach(attachment => {
-      if (attachment && attachment.url) {
-        images.push(attachment.url);
-        console.log(`✅ Found image 2 (first): ${attachment.url}`);
-      }
-    });
-  }
-
-  // 画像1を2番目にチェック
-  const image1Field = record.fields['画像1'];
-  if (image1Field && Array.isArray(image1Field) && image1Field.length > 0) {
-    image1Field.forEach(attachment => {
-      if (attachment && attachment.url) {
-        images.push(attachment.url);
-        console.log(`✅ Found image 1 (second): ${attachment.url}`);
-      }
-    });
-  }
-
-  // 画像3〜9を順番にチェック
-  for (let i = 3; i <= 9; i++) {
-    const imageField = record.fields[`画像${i}`];
-    if (imageField && Array.isArray(imageField) && imageField.length > 0) {
-      imageField.forEach(attachment => {
-        if (attachment && attachment.url) {
-          images.push(attachment.url);
-          console.log(`✅ Found image ${i}: ${attachment.url}`);
-        }
-      });
+// 安全な値取得関数
+const getFieldValue = (fields, patterns, options = {}) => {
+  const { preferNumber = false, preferString = false } = options;
+  
+  // 完全一致を最初に試す
+  for (const pattern of patterns) {
+    if (fields[pattern] !== undefined && fields[pattern] !== null && fields[pattern] !== '') {
+      return fields[pattern];
     }
   }
-
-  console.log(`🖼️ Total images found: ${images.length}`);
-  return images;
-};
-
-// 物件種別の標準化
-const getPropertyType = (typeString) => {
-  if (!typeString) return 'other';
-  const type = typeString.toLowerCase();
   
-  if (type.includes('店舗') || type.includes('飲食') || type.includes('restaurant')) {
-    return 'restaurant';
-  }
-  if (type.includes('事務所') || type.includes('オフィス') || type.includes('office')) {
-    return 'office';
-  }
-  if (type.includes('倉庫') || type.includes('工場') || type.includes('warehouse')) {
-    return 'warehouse';
-  }
-  if (type.includes('居宅') || type.includes('住宅') || type.includes('マンション')) {
-    return 'residential';
-  }
-  return 'other';
-};
-
-// 賃料の計算（万円から円に変換）
-const calculateRent = (rentManYen, taxAmount = 0) => {
-  if (!rentManYen) return null;
-  const rentYen = parseFloat(rentManYen) * 10000; // 万円を円に変換
-  const tax = parseFloat(taxAmount) || 0;
-  return Math.round(rentYen + tax);
-};
-
-// 住所の結合
-const buildFullAddress = (fields) => {
-  const parts = [
-    fields['都道府県名'],
-    fields['所在地名１'],
-    fields['所在地名２'],
-    fields['所在地名３'],
-    fields['建物名']
-  ].filter(part => part && part.trim() !== '');
-  
-  return parts.join('');
-};
-
-// 沿線・駅情報の処理
-const parseTransportInfo = (fields) => {
-  const trainLines = [];
-  const stations = [];
-  const walkingTimes = [];
-
-  // 最大3つの沿線をチェック
-  for (let i = 1; i <= 3; i++) {
-    const lineField = i === 1 ? '沿線名' : `沿線名${i}`;
-    const stationField = i === 1 ? '駅名' : `駅名${i}`;
-    const walkField = i === 1 ? '駅より徒歩' : `駅より徒歩${i}`;
-
-    const line = fields[lineField];
-    const station = fields[stationField];
-    const walk = fields[walkField];
-
-    if (line) {
-      const normalizedLine = normalizeLineName(line);
-      if (normalizedLine) {
-        trainLines.push(normalizedLine);
-      } else {
-        trainLines.push(line);
-      }
-    }
-
-    if (station) stations.push(station);
-    if (walk) walkingTimes.push(parseInt(walk) || 0);
-  }
-
-  return {
-    trainLines,
-    nearestStation: stations[0] || '',
-    walkingMinutes: walkingTimes[0] || null
-  };
-};
-
-// 沿線名の正規化
-const normalizeLineName = (lineName) => {
-  if (!lineName) return null;
-
-  // CSVデータから完全一致を探す
-  const exactMatch = trainStationData.find(line => line.name === lineName);
-  if (exactMatch) return exactMatch.name;
-
-  // 部分一致を探す
-  const partialMatch = trainStationData.find(line => 
-    line.name.includes(lineName) || 
-    lineName.includes(line.name.replace(/^ＪＲ|^東京メトロ|^都営地下鉄/, ''))
-  );
-  
-  return partialMatch ? partialMatch.name : null;
-};
-
-// 数値判定関数
-const isNumeric = (value) => {
-  if (value === null || value === undefined || value === '') return false;
-  const num = parseFloat(value);
-  return !isNaN(num) && isFinite(num);
-};
-
-// 面積データを安全に取得
-const getAreaValue = (fields) => {
-  console.log('🏢 Parsing area from fields...');
-  
-  const areaFields = [
-    '使用部分面積', '面積', '専有面積', '建物面積', '延床面積'
-  ];
-
-  for (const fieldName of areaFields) {
-    const value = fields[fieldName];
-    console.log(`🔍 Checking field "${fieldName}": ${value}`);
-    
-    if (value && isNumeric(value)) {
-      const numValue = parseFloat(value);
-      console.log(`✅ Found valid area: ${numValue}㎡ from field "${fieldName}"`);
-      return numValue;
+  // 正規表現での部分一致
+  const fieldNames = Object.keys(fields);
+  for (const pattern of patterns) {
+    const regex = new RegExp(pattern, 'i');
+    const found = fieldNames.find(fieldName => regex.test(fieldName));
+    if (found && fields[found] !== undefined && fields[found] !== null && fields[found] !== '') {
+      return fields[found];
     }
   }
-
-  console.log('⚠️ No valid area found in any field');
+  
   return null;
 };
 
-// Airtableのデータを標準化された物件フォーマットに変換
-const transformAirtableRecord = (record) => {
+// 安全な文字列変換
+const safeString = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+};
+
+// 安全な数値変換
+const safeNumber = (value) => {
+  if (value === null || value === undefined || value === '' || value === '無し' || value === 'なし') {
+    return null;
+  }
+  
+  if (typeof value === 'number') {
+    return isFinite(value) ? value : null;
+  }
+  
+  // 文字列から数値を抽出
+  const cleanValue = String(value).replace(/[^\d.-]/g, '');
+  const num = parseFloat(cleanValue);
+  
+  return !isNaN(num) && isFinite(num) ? num : null;
+};
+
+// 画像URLを抽出
+const extractImages = (record) => {
+  const images = [];
   const fields = record.fields;
-  console.log('🔍 Processing Record ID:', record.id);
 
+  Object.keys(fields).forEach(fieldName => {
+    const fieldValue = fields[fieldName];
+    
+    if (Array.isArray(fieldValue) && fieldValue.length > 0) {
+      fieldValue.forEach(item => {
+        if (item && typeof item === 'object' && item.url) {
+          images.push(item.url);
+        }
+      });
+    }
+  });
+
+  return images;
+};
+
+// 物件種別の判定
+const determinePropertyType = (typeString) => {
+  if (!typeString) return 'other';
+  const type = safeString(typeString).toLowerCase();
+  
+  if (/店舗|飲食|restaurant|shop|カフェ|レストラン/.test(type)) return 'restaurant';
+  if (/事務所|オフィス|office/.test(type)) return 'office';
+  if (/倉庫|工場|warehouse|factory/.test(type)) return 'warehouse';
+  if (/住宅|居住|マンション|アパート|residential/.test(type)) return 'residential';
+  if (/小売|retail|販売|store/.test(type)) return 'retail';
+  if (/サービス|service/.test(type)) return 'service';
+  
+  return 'other';
+};
+
+// 座標情報の抽出
+const extractCoordinates = (fields) => {
+  const latValue = getFieldValue(fields, ['lat', 'latitude', '緯度', 'Lat', 'Latitude']);
+  const lngValue = getFieldValue(fields, ['lng', 'lon', 'longitude', '経度', 'Lng', 'Longitude']);
+  
+  const lat = safeNumber(latValue);
+  const lng = safeNumber(lngValue);
+  
+  // 日本の座標範囲をチェック
+  if (lat && lng && lat >= 24 && lat <= 46 && lng >= 123 && lng <= 146) {
+    return { lat, lng, source: 'airtable' };
+  }
+  
+  return null;
+};
+
+// Airtableレコードの変換
+const transformRecord = (record) => {
+  const fields = record.fields;
+  
   // 基本情報の抽出
-  const propertyTitle = fields['物件タイトル'] || fields['物件名'] || `物件-${record.id.slice(-4)}`;
-  const fullAddress = buildFullAddress(fields);
-  const transportInfo = parseTransportInfo(fields);
+  const title = getFieldValue(fields, [
+    'title', 'name', 'property.?name', '物件名', 'タイトル', 'Title', 'Name'
+  ]) || `物件-${record.id.slice(-6)}`;
 
-  // 座標情報
-  const latitude = fields['Latitude'] ? parseFloat(fields['Latitude']) : null;
-  const longitude = fields['Longitude'] ? parseFloat(fields['Longitude']) : null;
-  const coordinates = (latitude && longitude) ? {
-    lat: latitude,
-    lng: longitude,
-    source: 'airtable'
-  } : null;
+  const address = getFieldValue(fields, [
+    'address', 'full.?address', '住所', '所在地', 'Address', 'Location'
+  ]) || '';
 
-  // 賃料計算
-  const rent = calculateRent(fields['賃料（万円）'], fields['うち賃料消費税']);
-  const deposit = calculateRent(fields['敷金'], 0);
-  const keyMoney = calculateRent(fields['礼金'], fields['うち礼金消費税']);
-  const managementFee = calculateRent(fields['管理費'], fields['うち管理費消費税']);
+  const rent = safeNumber(getFieldValue(fields, [
+    'rent', 'monthly.?rent', 'price', '賃料', '家賃', 'Rent', 'Price'
+  ]));
 
-  // 面積情報
-  const area = getAreaValue(fields);
-  const tsuboPrice = fields['坪単価 ※3.30578で換算'] ? parseFloat(fields['坪単価 ※3.30578で換算']) : null;
+  const area = safeNumber(getFieldValue(fields, [
+    'area', 'floor.?area', 'size', '面積', '専有面積', 'Area', 'Size'
+  ]));
 
-  // 建物情報
-  const buildingAge = fields['築年月'] ? new Date(fields['築年月']).getFullYear() : null;
-  const currentYear = new Date().getFullYear();
-  const ageInYears = buildingAge ? currentYear - buildingAge : null;
+  const station = safeString(getFieldValue(fields, [
+    'station', 'nearest.?station', '最寄駅', '駅', 'Station'
+  ]));
 
-  // 設備・条件
-  const equipment = [
-    fields['設備・条件'],
-    fields['設備(フリースペース)'],
-    fields['条件(フリースペース)']
-  ].filter(item => item && item.trim() !== '').join(',');
+  const propertyType = determinePropertyType(getFieldValue(fields, [
+    'type', 'category', 'property.?type', '種別', '用途', 'Type', 'Category'
+  ]));
 
-  // 画像を取得
-  const images = parseImages(record);
+  // 座標と画像
+  const coordinates = extractCoordinates(fields);
+  const images = extractImages(record);
 
+  // 変換された物件データ
   const transformedProperty = {
-    // 基本情報
     id: record.id,
-    title: propertyTitle,
-    type: getPropertyType(fields['物件種目']),
-
-    // 所在地情報
-    address: fullAddress,
-    prefecture: fields['都道府県名'] || '',
-    ward: fields['所在地名１'] || '',
-    location: fields['所在地名２'] || '',
-    buildingName: fields['建物名'] || '',
-
-    // 交通情報
-    ...transportInfo,
-
-    // 座標
+    title: safeString(title),
+    type: propertyType,
+    address: safeString(address),
+    ward: safeString(getFieldValue(fields, ['ward', '区', '市区町村', 'Ward'])),
+    location: safeString(getFieldValue(fields, ['location', '所在地', 'Location'])),
+    trainLines: [],
+    nearestStation: station,
+    walkingMinutes: safeNumber(getFieldValue(fields, ['walk', 'walking', '徒歩', 'Walking'])),
     coordinates,
-
-    // 賃料情報
-    rent,
-    rentPerSqm: fields['㎡単価'] ? parseFloat(fields['㎡単価']) : null,
-    tsuboPrice,
-    deposit,
-    keyMoney,
-    managementFee,
-    securityDeposit: calculateRent(fields['保証金'], 0),
-
-    // 面積・構造
+    rent: rent ? (rent < 1000 ? rent * 10000 : rent) : null, // 万円→円変換
+    deposit: safeNumber(getFieldValue(fields, ['deposit', '敷金', 'Deposit'])),
     area,
-    structure: fields['建物構造'] || '',
-    floor: fields['所在階'] || '',
-    totalFloors: fields['地上階層'] || '',
-    basementFloors: fields['地下階層'] || '',
-
-    // 契約条件
-    contractPeriod: fields['契約期間'] || '',
-    renewalType: fields['更新区分'] || '',
-    renewalFee: calculateRent(fields['更新料'], 0),
-
-    // 建物情報
-    buildYear: buildingAge,
-    buildingAge: ageInYears,
-
-    // 設備・条件
-    equipment,
-    features: equipment ? equipment.split(',').map(f => f.trim()) : [],
-
-    // 駐車場
-    parkingAvailable: fields['駐車場在否'] === 'あり' || fields['駐車場在否'] === '有',
-    parkingFee: fields['駐車場月額'] ? parseFloat(fields['駐車場月額']) : null,
-
-    // 入居条件
-    availability: fields['現況'] || '',
-    availableFrom: fields['入居時期'] || '',
-    moveInDate: fields['入居年月'] || '',
-
-    // 保険・鍵
-    insuranceRequired: fields['保険加入義務'] === '要' || fields['保険加入義務'] === '必要',
-    keyExchangeRequired: fields['鍵交換区分'] === '要' || fields['鍵交換区分'] === '必要',
-    keyExchangeFee: fields['鍵交換代金'] ? parseFloat(fields['鍵交換代金']) : null,
-
-    // 備考
-    notes: [
-      fields['備考１'],
-      fields['備考２'], 
-      fields['備考３'],
-      fields['備考４']
-    ].filter(note => note && note.trim() !== '').join('\n'),
-
-    // 詳細情報
-    details: {
-      propertyNumber: fields['物件番号'] || '',
-      propertyType: fields['物件種目'] || '',
-      rentManYen: fields['賃料（万円）'] || 0,
-      rentTax: fields['うち賃料消費税'] || 0,
-      sqmPrice: fields['㎡単価'] || 0,
-      tsuboPrice: fields['坪単価 ※3.30578で換算'] || 0,
-      securityDeposit: fields['敷金'] || 0,
-      keyMoney: fields['礼金'] || 0,
-      keyMoneyTax: fields['うち礼金消費税'] || 0,
-      guaranteeDeposit: fields['保証金'] || 0,
-      contractPeriod: fields['契約期間'] || '',
-      depreciationCode: fields['償却コード'] || '',
-      depreciationMonths: fields['償却月数'] || '',
-      depreciationRate: fields['償却率'] || '',
-      buildingLeaseType: fields['建物賃貸借区分'] || '',
-      buildingLeasePeriod: fields['建物賃貸借期間'] || '',
-      buildingLeaseRenewal: fields['建物賃貸借更新'] || '',
-      usageArea: getAreaValue(fields),
-      buildingConstruction: fields['建物構造'] || '',
-      aboveFloors: fields['地上階層'] || '',
-      belowFloors: fields['地下階層'] || '',
-      currentFloor: fields['所在階'] || '',
-      managementFeeAmount: fields['管理費'] || 0,
-      managementFeeTax: fields['うち管理費消費税'] || 0,
-      commonAreaFee: fields['共益費'] || 0,
-      renewalCategory: fields['更新区分'] || '',
-      renewalFeeAmount: fields['更新料'] || 0,
-      otherMonthlyFeeName: fields['その他月額費名称'] || '',
-      otherMonthlyFeeAmount: fields['その他月額費金額'] || 0,
-      parkingAvailability: fields['駐車場在否'] || '',
-      parkingMonthlyFee: fields['駐車場月額'] || 0,
-      currentStatus: fields['現況'] || '',
-      moveInTiming: fields['入居時期'] || '',
-      moveInDate: fields['入居年月'] || '',
-      insuranceObligation: fields['保険加入義務'] || '',
-      equipmentConditions: fields['設備・条件'] || '',
-      equipmentFreeSpace: fields['設備(フリースペース)'] || '',
-      conditionsFreeSpace: fields['条件(フリースペース)'] || '',
-      keyExchangeCategory: fields['鍵交換区分'] || '',
-      keyExchangeAmount: fields['鍵交換代金'] || 0,
-      remarks1: fields['備考１'] || '',
-      remarks2: fields['備考２'] || '',
-      remarks3: fields['備考３'] || '',
-      remarks4: fields['備考４'] || '',
-      fullAddress: fields['住所'] || fullAddress
-    },
-
-    // 画像
+    availability: safeString(getFieldValue(fields, ['status', '現況', 'Status'])),
+    isAvailable: true,
     images,
-
-    // メタデータ
     postedDate: new Date().toISOString(),
     lastUpdated: new Date().toISOString(),
-    featured: false,
-    source: 'airtable'
+    featured: Math.random() < 0.15,
+    source: 'airtable',
+    details: {
+      propertyId: `MY-${record.id.slice(-8)}`,
+      rawFields: fields,
+      ...fields
+    }
   };
-
-  console.log('✅ Transformed property:', {
-    id: transformedProperty.id,
-    title: transformedProperty.title,
-    address: transformedProperty.address,
-    coordinates: transformedProperty.coordinates,
-    rent: transformedProperty.rent,
-    area: transformedProperty.area,
-    trainLines: transformedProperty.trainLines,
-    images: transformedProperty.images.length
-  });
 
   return transformedProperty;
 };
 
-// 全ての物件データを取得（改善版）
+// 全物件データの取得（複数ビュー対応）
 export const fetchAllProperties = async () => {
   try {
-    console.log('🚀 Starting Airtable data fetch...');
+    console.log('🚀 Fetching all properties from Airtable...');
     
-    // まず接続テストを実行
-    const connectionTest = await validateAirtableConnection();
-    if (!connectionTest.success) {
-      throw new Error(`Connection failed: ${connectionTest.error}`);
-    }
+    // まず動作するビューを見つける
+    const connectionResult = await tryMultipleViews(async (params) => {
+      return await airtableClient.get(`/${AIRTABLE_TABLE_NAME}`, { params });
+    });
+    
+    const workingViewId = connectionResult.viewId;
+    console.log(`✅ Using working view: ${workingViewId || 'Default view'}`);
 
+    // 全データを取得
     let allRecords = [];
     let offset = null;
     let pageCount = 0;
-    const maxPages = 10; // 無限ループ防止
+    const maxPages = 50;
 
     do {
       pageCount++;
       console.log(`📄 Fetching page ${pageCount}...`);
       
       if (pageCount > maxPages) {
-        console.warn('⚠️ Maximum page limit reached, stopping fetch');
+        console.warn('⚠️ Reached maximum page limit');
         break;
       }
 
       const params = {
-        maxRecords: 100,
-        view: 'Grid view'
+        maxRecords: 100
       };
+      
+      if (workingViewId) {
+        params.view = workingViewId;
+      }
       
       if (offset) {
         params.offset = offset;
       }
 
-      const response = await airtableClient.get(`/${AIRTABLE_TABLE_NAME}`, {
-        params
-      });
-
+      const response = await airtableClient.get(`/${AIRTABLE_TABLE_NAME}`, { params });
       const records = response.data.records || [];
+      
       allRecords = allRecords.concat(records);
       offset = response.data.offset;
 
-      console.log(`📄 Page ${pageCount}: ${records.length} records fetched`);
+      console.log(`📄 Page ${pageCount}: ${records.length} records`);
       
-      // オフセットがない場合は終了
-      if (!offset) {
-        break;
-      }
+      if (!offset || records.length === 0) break;
+      
+      // レート制限対策
+      await new Promise(resolve => setTimeout(resolve, 200));
 
     } while (offset && pageCount < maxPages);
 
-    console.log(`✅ Total fetched: ${allRecords.length} records from Airtable`);
+    console.log(`✅ Total records fetched: ${allRecords.length}`);
 
-    // サンプルレコードの詳細ログ
-    if (allRecords.length > 0) {
-      console.log('📋 Sample record fields:', Object.keys(allRecords[0].fields || {}));
-      console.log('🖼️ Image fields check:', {
-        '画像1': !!allRecords[0].fields['画像1'],
-        '画像2': !!allRecords[0].fields['画像2'],
-        '画像3': !!allRecords[0].fields['画像3']
-      });
+    if (allRecords.length === 0) {
+      console.warn('⚠️ No records found');
+      return [];
     }
 
-    // データを変換
-    const transformedProperties = allRecords
-      .map(transformAirtableRecord)
+    // データ変換
+    const properties = allRecords
+      .map((record, index) => {
+        try {
+          return transformRecord(record);
+        } catch (error) {
+          console.error(`❌ Error transforming record ${index}:`, error);
+          return null;
+        }
+      })
       .filter(property => {
-        // 有効なデータのみを返す
-        const hasValidTitle = property.title && !property.title.includes('物件-');
-        const hasValidAddress = property.address && property.address.length > 0;
-        return hasValidTitle && hasValidAddress;
+        return property && 
+               property.title && 
+               property.title.length > 5 && 
+               !property.title.includes('物件-rec');
       });
 
-    console.log(`🎯 Valid properties: ${transformedProperties.length}/${allRecords.length}`);
+    console.log(`🎯 Valid properties: ${properties.length}/${allRecords.length}`);
 
-    return transformedProperties;
+    // データ品質レポート
+    const qualityReport = {
+      total: properties.length,
+      withCoordinates: properties.filter(p => p.coordinates).length,
+      withImages: properties.filter(p => p.images.length > 0).length,
+      withRent: properties.filter(p => p.rent).length,
+      withAddress: properties.filter(p => p.address && p.address.length > 10).length,
+      withStation: properties.filter(p => p.nearestStation).length
+    };
+
+    console.log('📊 Data Quality Report:', qualityReport);
+
+    if (properties.length > 0) {
+      console.log('🔍 Sample property:', properties[0]);
+    }
+
+    return properties;
 
   } catch (error) {
-    console.error('❌ Error fetching properties from Airtable:', error);
-    
-    // 詳細なエラー情報を提供
-    if (error.response) {
-      console.error('Response details:', {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        data: error.response.data
-      });
-    }
-    
-    // エラー時は空配列を返す代わりに、エラーを再スローして上位で処理
-    throw new Error(`Airtable sync failed: ${error.message}`);
+    console.error('❌ Error fetching properties:', error);
+    throw new Error(`Failed to fetch properties: ${error.message}`);
   }
 };
 
@@ -608,10 +504,10 @@ export const fetchPropertyById = async (id) => {
     console.log(`🔍 Fetching property by ID: ${id}`);
     
     const response = await airtableClient.get(`/${AIRTABLE_TABLE_NAME}/${id}`);
-    const transformedProperty = transformAirtableRecord(response.data);
+    const property = transformRecord(response.data);
     
-    console.log('✅ Property fetched successfully:', transformedProperty);
-    return transformedProperty;
+    console.log('✅ Property fetched:', property.title);
+    return property;
     
   } catch (error) {
     console.error('❌ Error fetching property by ID:', error);
@@ -619,57 +515,16 @@ export const fetchPropertyById = async (id) => {
   }
 };
 
-// 条件に基づいて物件を検索
+// 検索機能
 export const searchProperties = async (filters = {}) => {
   try {
     console.log('🔍 Searching properties with filters:', filters);
     
-    let filterFormula = '';
-    const conditions = [];
-
-    // フィルター条件を構築
-    if (filters.propertyType) {
-      conditions.push(`FIND("${filters.propertyType}",{物件種目})`);
-    }
+    const properties = await fetchAllProperties();
     
-    if (filters.area) {
-      conditions.push(`OR(FIND("${filters.area}",{所在地名１}),FIND("${filters.area}",{住所}))`);
-    }
-    
-    if (filters.station) {
-      conditions.push(`OR(FIND("${filters.station}",{駅名}),FIND("${filters.station}",{駅名２}),FIND("${filters.station}",{駅名３}))`);
-    }
-    
-    if (filters.maxRent) {
-      conditions.push(`{賃料（万円)} <=${filters.maxRent}`);
-    }
-    
-    if (filters.minArea) {
-      conditions.push(`{使用部分面積} >=${filters.minArea}`);
-    }
-
-    if (conditions.length > 0) {
-      filterFormula = `AND(${conditions.join(',')})`;
-    }
-
-    const params = {
-      maxRecords: 100,
-      view: 'Grid view',
-    };
-    
-    if (filterFormula) {
-      params.filterByFormula = filterFormula;
-    }
-
-    const response = await airtableClient.get(`/${AIRTABLE_TABLE_NAME}`, {
-      params
-    });
-
-    const transformedProperties = response.data.records
-      .map(transformAirtableRecord)
-      .filter(property => property.address && property.title);
-
-    return transformedProperties;
+    // フィルタリングはフロントエンドで実行
+    console.log(`🔍 Search base: ${properties.length} properties`);
+    return properties.filter(property => property.isAvailable);
     
   } catch (error) {
     console.error('❌ Error searching properties:', error);
@@ -677,71 +532,47 @@ export const searchProperties = async (filters = {}) => {
   }
 };
 
-// 統計情報を取得
+// 統計情報の取得
 export const getPropertyStats = async () => {
   try {
-    console.log('📊 Calculating property statistics...');
-    
     const properties = await fetchAllProperties();
     
     const stats = {
       total: properties.length,
+      available: properties.filter(p => p.isAvailable).length,
       byType: {},
       byWard: {},
       averageRent: 0,
       averageArea: 0,
-      priceRanges: {
-        under10: 0,
-        '10to30': 0,
-        '30to50': 0,
-        '50to100': 0,
-        over100: 0
-      },
-      recentlyAdded: 0,
-      withImages: 0,
-      withCoordinates: 0
+      withImages: properties.filter(p => p.images.length > 0).length,
+      withCoordinates: properties.filter(p => p.coordinates).length
     };
 
+    // 統計計算
     let totalRent = 0;
     let totalArea = 0;
     let rentCount = 0;
     let areaCount = 0;
 
     properties.forEach(property => {
-      // Type別集計
+      // 種別別統計
       stats.byType[property.type] = (stats.byType[property.type] || 0) + 1;
 
-      // Ward別集計
+      // エリア別統計
       if (property.ward) {
         stats.byWard[property.ward] = (stats.byWard[property.ward] || 0) + 1;
       }
 
-      // 平均計算用
-      if (property.rent) {
+      // 賃料統計
+      if (property.rent && property.isAvailable) {
         totalRent += property.rent;
         rentCount++;
-
-        // 価格帯別集計
-        const rentInMan = property.rent / 10000;
-        if (rentInMan < 10) stats.priceRanges.under10++;
-        else if (rentInMan < 30) stats.priceRanges['10to30']++;
-        else if (rentInMan < 50) stats.priceRanges['30to50']++;
-        else if (rentInMan < 100) stats.priceRanges['50to100']++;
-        else stats.priceRanges.over100++;
       }
 
-      if (property.area && isNumeric(property.area)) {
+      // 面積統計
+      if (property.area) {
         totalArea += property.area;
         areaCount++;
-      }
-
-      // その他の統計
-      if (property.images && property.images.length > 0) {
-        stats.withImages++;
-      }
-      
-      if (property.coordinates) {
-        stats.withCoordinates++;
       }
     });
 
@@ -752,48 +583,24 @@ export const getPropertyStats = async () => {
     return stats;
     
   } catch (error) {
-    console.error('❌ Error getting property stats:', error);
+    console.error('❌ Error calculating stats:', error);
     return null;
   }
 };
 
-// CSVデータから沿線データを取得
+// その他のエクスポート
 export const fetchTrainLines = async () => {
-  try {
-    console.log('🚆 Loading train lines from CSV data...');
-    console.log(`✅ Loaded ${trainStationData.length} train lines from CSV`);
-    return trainStationData;
-  } catch (error) {
-    console.error('❌ Error loading train lines from CSV:', error);
-    return trainStationData;
-  }
+  return trainStationData;
 };
 
-// 特定の沿線の駅を取得
 export const fetchStationsByLine = async (lineId) => {
-  try {
-    console.log(`🚉 Fetching stations for line ID: ${lineId}`);
-    const line = trainStationData.find(line => line.id === lineId || line.name === lineId);
-    
-    if (line) {
-      console.log(`✅ Found ${line.stations.length} stations for line: ${line.name}`);
-      return line.stations;
-    } else {
-      console.warn(`⚠️ Line not found: ${lineId}`);
-      return [];
-    }
-  } catch (error) {
-    console.error('❌ Error fetching stations:', error);
-    return [];
-  }
+  const line = trainStationData.find(line => line.id === lineId || line.name === lineId);
+  return line ? line.stations : [];
 };
 
-// CSVデータから駅を取得する関数
 export const getStationsByLineName = (lineName) => {
   if (!lineName) return [];
-  const stations = getStationsFromCSV(lineName);
-  console.log(`🚉 Found ${stations.length} stations for ${lineName} from CSV data`);
-  return stations;
+  return getStationsFromCSV(lineName);
 };
 
 export default {
