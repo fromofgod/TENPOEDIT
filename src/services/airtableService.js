@@ -6,7 +6,7 @@ const AIRTABLE_API_KEY = import.meta.env.VITE_AIRTABLE_API_KEY || 'patxWbNWEvvGN
 const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID || 'appBFYfgbWNZyP0QR';
 const AIRTABLE_TABLE_NAME = import.meta.env.VITE_AIRTABLE_TABLE_NAME || 'Reins';
 
-// 複数のビューIDを試す
+// 複数のビューIDを試す（Grid viewをデフォルトとして使用）
 const POSSIBLE_VIEW_IDS = [
   'shrKoKZIuYxzEI6K4', // 提供されたビューID
   'viwGridView',        // 一般的なGrid view ID
@@ -147,7 +147,7 @@ export const validateAirtableConnection = async () => {
       const isArray = Array.isArray(value);
       const hasUrl = isArray && value.length > 0 && value[0]?.url;
       
-      console.log(`  "${fieldName}":`, {
+      console.log(`  ${fieldName}:`, {
         type: type,
         isArray: isArray,
         hasUrl: hasUrl,
@@ -155,12 +155,62 @@ export const validateAirtableConnection = async () => {
       });
     });
 
+    // 画像フィールドの検出
+    const imageFields = availableFields.filter(field => {
+      const value = fields[field];
+      return Array.isArray(value) && value.length > 0 && value[0]?.url;
+    });
+    
+    console.log('🖼️ Image fields detected:', imageFields);
+
+    // 重要フィールドの自動検出（より幅広いパターン）
+    const fieldDetection = {
+      title: availableFields.filter(f => 
+        /title|name|物件|タイトル|名前|property.*name/i.test(f)
+      ),
+      address: availableFields.filter(f => 
+        /address|住所|所在地|location|場所/i.test(f)
+      ),
+      rent: availableFields.filter(f => 
+        /rent|賃料|家賃|price|料金|金額/i.test(f)
+      ),
+      area: availableFields.filter(f => 
+        /area|面積|size|広さ|坪|㎡|平米/i.test(f)
+      ),
+      station: availableFields.filter(f => 
+        /station|駅|最寄|nearest/i.test(f)
+      ),
+      type: availableFields.filter(f => 
+        /type|種別|用途|category|カテゴリ|業種/i.test(f)
+      ),
+      coordinates: availableFields.filter(f => 
+        /lat|lng|lon|緯度|経度|coordinate|gps/i.test(f)
+      )
+    };
+
+    console.log('🎯 Field detection results:', fieldDetection);
+
+    // データ品質チェック
+    const dataQuality = {
+      totalFields: availableFields.length,
+      textFields: availableFields.filter(f => typeof fields[f] === 'string').length,
+      numberFields: availableFields.filter(f => typeof fields[f] === 'number').length,
+      arrayFields: availableFields.filter(f => Array.isArray(fields[f])).length,
+      imageFields: imageFields.length,
+      emptyFields: availableFields.filter(f => !fields[f] || fields[f] === '').length
+    };
+
+    console.log('📊 Data quality analysis:', dataQuality);
+
     return {
       success: true,
       workingViewId: workingViewId,
       recordCount: records.length,
       fields: availableFields,
+      fieldDetection,
+      dataQuality,
       sampleData: fields,
+      imageFields,
       rawRecord: firstRecord
     };
 
@@ -180,36 +230,27 @@ export const validateAirtableConnection = async () => {
   }
 };
 
-// 安全な値取得関数（実際のフィールド名に基づく）
-const getFieldValue = (fields, exactFieldNames, fallbackPatterns = [], options = {}) => {
-  const { debug = false } = options;
+// 安全な値取得関数
+const getFieldValue = (fields, patterns, options = {}) => {
+  const { preferNumber = false, preferString = false } = options;
   
-  if (debug) {
-    console.log(`🔍 Searching for exact fields:`, exactFieldNames);
-    console.log(`📋 Available fields:`, Object.keys(fields));
-  }
-  
-  // 1. 正確なフィールド名での検索（最優先）
-  for (const fieldName of exactFieldNames) {
-    if (fields[fieldName] !== undefined && fields[fieldName] !== null && fields[fieldName] !== '') {
-      if (debug) console.log(`✅ Exact field found: "${fieldName}" = ${fields[fieldName]}`);
-      return fields[fieldName];
+  // 完全一致を最初に試す
+  for (const pattern of patterns) {
+    if (fields[pattern] !== undefined && fields[pattern] !== null && fields[pattern] !== '') {
+      return fields[pattern];
     }
   }
   
-  // 2. フォールバックパターンでの検索
+  // 正規表現での部分一致
   const fieldNames = Object.keys(fields);
-  for (const pattern of fallbackPatterns) {
-    const found = fieldNames.find(fieldName => 
-      fieldName.toLowerCase().includes(pattern.toLowerCase())
-    );
+  for (const pattern of patterns) {
+    const regex = new RegExp(pattern, 'i');
+    const found = fieldNames.find(fieldName => regex.test(fieldName));
     if (found && fields[found] !== undefined && fields[found] !== null && fields[found] !== '') {
-      if (debug) console.log(`✅ Fallback match found: "${found}" (pattern: ${pattern}) = ${fields[found]}`);
       return fields[found];
     }
   }
   
-  if (debug) console.log(`❌ No match found for exact fields:`, exactFieldNames);
   return null;
 };
 
@@ -229,11 +270,8 @@ const safeNumber = (value) => {
     return isFinite(value) ? value : null;
   }
   
-  // 文字列から数値を抽出（カンマ、全角数字も対応）
-  const cleanValue = String(value)
-    .replace(/[^\d.-]/g, '') // 数字、ピリオド、マイナス以外を除去
-    .replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)); // 全角数字を半角に
-  
+  // 文字列から数値を抽出
+  const cleanValue = String(value).replace(/[^\d.-]/g, '');
   const num = parseFloat(cleanValue);
   
   return !isNaN(num) && isFinite(num) ? num : null;
@@ -261,29 +299,23 @@ const extractImages = (record) => {
 
 // 物件種別の判定
 const determinePropertyType = (typeString) => {
-  if (!typeString) return 'restaurant'; // デフォルトを飲食店に
+  if (!typeString) return 'other';
   const type = safeString(typeString).toLowerCase();
   
-  if (/店舗|飲食|restaurant|shop|カフェ|レストラン|小売|retail|商業/.test(type)) return 'restaurant';
-  if (/事務所|オフィス|office|業務/.test(type)) return 'office';
-  if (/倉庫|工場|warehouse|factory|物流/.test(type)) return 'warehouse';
-  if (/住宅|居住|マンション|アパート|residential|住居/.test(type)) return 'residential';
+  if (/店舗|飲食|restaurant|shop|カフェ|レストラン/.test(type)) return 'restaurant';
+  if (/事務所|オフィス|office/.test(type)) return 'office';
+  if (/倉庫|工場|warehouse|factory/.test(type)) return 'warehouse';
+  if (/住宅|居住|マンション|アパート|residential/.test(type)) return 'residential';
+  if (/小売|retail|販売|store/.test(type)) return 'retail';
   if (/サービス|service/.test(type)) return 'service';
   
-  return 'restaurant'; // デフォルトを飲食店に
+  return 'other';
 };
 
 // 座標情報の抽出
 const extractCoordinates = (fields) => {
-  // 正確なフィールド名を優先
-  const latValue = getFieldValue(fields, 
-    ['緯度', 'Latitude', 'lat'], 
-    ['lat', 'latitude', '緯度', 'GPS緯度']
-  );
-  const lngValue = getFieldValue(fields, 
-    ['経度', 'Longitude', 'lng'], 
-    ['lng', 'lon', 'longitude', '経度', 'GPS経度']
-  );
+  const latValue = getFieldValue(fields, ['lat', 'latitude', '緯度', 'Lat', 'Latitude']);
+  const lngValue = getFieldValue(fields, ['lng', 'lon', 'longitude', '経度', 'Lng', 'Longitude']);
   
   const lat = safeNumber(latValue);
   const lng = safeNumber(lngValue);
@@ -296,283 +328,65 @@ const extractCoordinates = (fields) => {
   return null;
 };
 
-// 沿線情報を抽出・解析
-const extractTrainLines = (fields) => {
-  const trainLineField = getFieldValue(fields, 
-    ['沿線', '路線', '交通', 'アクセス'], 
-    ['train', 'line', 'access', '沿線', '路線']
-  );
-  
-  if (!trainLineField) return [];
-  
-  const lines = String(trainLineField)
-    .split(/[、,\/・]/) // 区切り文字で分割
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .slice(0, 3); // 最大3路線まで
-  
-  return lines;
-};
-
-// 物件タイトルを生成（統一フォーマット）
-const generatePropertyTitle = (fields, recordId) => {
-  // 1. 既存のタイトル・物件名フィールドをチェック
-  const existingTitle = getFieldValue(fields, 
-    ['物件名', '建物名', 'タイトル', 'title', 'name'],
-    ['物件', '建物', 'タイトル', 'title']
-  );
-  
-  if (existingTitle && existingTitle.length > 5) {
-    return safeString(existingTitle);
-  }
-  
-  // 2. 住所と駅情報から自動生成
-  const address = getFieldValue(fields, 
-    ['住所', '所在地', 'address', 'location'],
-    ['住所', '所在', 'address']
-  );
-  
-  const station = getFieldValue(fields, 
-    ['最寄駅', '駅', 'station', 'access'],
-    ['駅', 'station', '最寄']
-  );
-  
-  const area = safeNumber(getFieldValue(fields, 
-    ['面積', '専有面積', '使用面積', 'area'],
-    ['面積', 'area', 'size']
-  ));
-  
-  // 3. タイトル生成ロジック
-  let generatedTitle = '';
-  
-  // 駅情報があれば使用
-  if (station) {
-    const stationName = station.replace(/駅$/, ''); // 「駅」を除去
-    generatedTitle += `${stationName}駅`;
-  }
-  
-  // 住所から区・市情報を抽出
-  if (address) {
-    const wardMatch = address.match(/(.*?[区市町村])/);
-    if (wardMatch) {
-      if (!generatedTitle.includes(wardMatch[1])) {
-        generatedTitle += generatedTitle ? ` ${wardMatch[1]}` : wardMatch[1];
-      }
-    }
-  }
-  
-  // 面積情報があれば追加
-  if (area) {
-    generatedTitle += ` ${Math.round(area)}㎡`;
-  }
-  
-  // 物件種別を追加
-  generatedTitle += ' 店舗物件';
-  
-  // フォールバック
-  if (!generatedTitle || generatedTitle.length < 8) {
-    generatedTitle = `店舗物件 ${recordId.slice(-6)}`;
-  }
-  
-  return generatedTitle;
-};
-
-// Airtableレコードの変換（完全マッピング版）
+// Airtableレコードの変換
 const transformRecord = (record) => {
   const fields = record.fields;
   
-  console.log(`🔄 Transforming record ${record.id}:`);
-  console.log('📋 Available fields:', Object.keys(fields));
-  
-  // === 基本情報の抽出 ===
-  
-  // 物件タイトル（統一フォーマット）
-  const title = generatePropertyTitle(fields, record.id);
-  
-  // 住所（正確なフィールド名）
-  const address = getFieldValue(fields, 
-    ['住所', '所在地', 'address'],
-    ['住所', '所在', 'address', 'location']
-  ) || '';
-  
-  // 区・市町村
-  const ward = getFieldValue(fields, 
-    ['区', '市区町村', '行政区'],
-    ['区', '市', '行政区', 'ward']
-  ) || '';
-  
-  // === 金額情報の抽出 ===
-  
-  // 賃料（万円単位で格納されている可能性を考慮）
-  const rentRaw = safeNumber(getFieldValue(fields, 
-    ['賃料', '家賃', '月額', 'rent'],
-    ['賃料', '家賃', 'rent', 'price']
-  ));
-  
-  // 賃料の単位変換（万円→円）
-  let rent = null;
-  if (rentRaw) {
-    if (rentRaw < 1000) {
-      rent = rentRaw * 10000; // 万円を円に変換
-    } else {
-      rent = rentRaw; // すでに円単位
-    }
-  }
-  
-  // 敷金・保証金
-  const deposit = safeNumber(getFieldValue(fields, 
-    ['敷金', '保証金', '礼金', 'deposit'],
-    ['敷金', '保証金', 'deposit']
-  ));
-  
-  // === 物理情報の抽出 ===
-  
-  // 面積
-  const area = safeNumber(getFieldValue(fields, 
-    ['面積', '専有面積', '使用面積', 'area'],
-    ['面積', 'area', 'size', '広さ']
-  ));
-  
-  // 所在階
-  const floor = safeString(getFieldValue(fields, 
-    ['階', '所在階', 'floor'],
-    ['階', 'floor', 'フロア']
-  ));
-  
-  // 建物構造
-  const structure = safeString(getFieldValue(fields, 
-    ['構造', '建物構造', 'structure'],
-    ['構造', 'RC', 'SRC', '鉄筋']
-  ));
-  
-  // === アクセス情報の抽出 ===
-  
-  // 最寄駅
-  const station = safeString(getFieldValue(fields, 
-    ['最寄駅', '駅', 'station'],
-    ['駅', 'station', '最寄', 'access']
-  ));
-  
-  // 徒歩時間
-  const walkingMinutes = safeNumber(getFieldValue(fields, 
-    ['徒歩', '徒歩時間', 'walk'],
-    ['徒歩', 'walk', 'walking', '分']
-  ));
-  
-  // 沿線情報
-  const trainLines = extractTrainLines(fields);
-  
-  // === その他の情報 ===
-  
-  // 物件種別
-  const propertyType = determinePropertyType(getFieldValue(fields, 
-    ['種別', '用途', 'type'],
-    ['種別', 'type', '用途', 'category']
-  ));
-  
-  // 現況・状態
-  const availability = safeString(getFieldValue(fields, 
-    ['現況', '状態', 'status'],
-    ['現況', 'status', '状態']
-  ));
-  
-  // 備考
-  const notes = safeString(getFieldValue(fields, 
-    ['備考', 'メモ', 'notes'],
-    ['備考', 'memo', 'notes', 'comment']
-  ));
-  
-  // === 技術情報 ===
-  
-  // 座標情報
-  const coordinates = extractCoordinates(fields);
-  
-  // 画像
-  const images = extractImages(record);
-  
-  console.log(`📊 Extracted data for ${record.id}:`, {
-    title: title,
-    address: address,
-    ward: ward,
-    rent: rent,
-    area: area,
-    station: station,
-    trainLines: trainLines.length,
-    type: propertyType,
-    images: images.length,
-    coordinates: !!coordinates
-  });
+  // 基本情報の抽出
+  const title = getFieldValue(fields, [
+    'title', 'name', 'property.?name', '物件名', 'タイトル', 'Title', 'Name'
+  ]) || `物件-${record.id.slice(-6)}`;
 
-  // === 変換された物件データ ===
+  const address = getFieldValue(fields, [
+    'address', 'full.?address', '住所', '所在地', 'Address', 'Location'
+  ]) || '';
+
+  const rent = safeNumber(getFieldValue(fields, [
+    'rent', 'monthly.?rent', 'price', '賃料', '家賃', 'Rent', 'Price'
+  ]));
+
+  const area = safeNumber(getFieldValue(fields, [
+    'area', 'floor.?area', 'size', '面積', '専有面積', 'Area', 'Size'
+  ]));
+
+  const station = safeString(getFieldValue(fields, [
+    'station', 'nearest.?station', '最寄駅', '駅', 'Station'
+  ]));
+
+  const propertyType = determinePropertyType(getFieldValue(fields, [
+    'type', 'category', 'property.?type', '種別', '用途', 'Type', 'Category'
+  ]));
+
+  // 座標と画像
+  const coordinates = extractCoordinates(fields);
+  const images = extractImages(record);
+
+  // 変換された物件データ
   const transformedProperty = {
     id: record.id,
-    title: title,
+    title: safeString(title),
     type: propertyType,
-    address: address,
-    ward: ward,
-    location: ward || address.split(' ')[0] || '',
-    trainLines: trainLines,
-    nearestStation: station.replace(/駅$/, ''), // 「駅」を除去
-    walkingMinutes: walkingMinutes,
+    address: safeString(address),
+    ward: safeString(getFieldValue(fields, ['ward', '区', '市区町村', 'Ward'])),
+    location: safeString(getFieldValue(fields, ['location', '所在地', 'Location'])),
+    trainLines: [],
+    nearestStation: station,
+    walkingMinutes: safeNumber(getFieldValue(fields, ['walk', 'walking', '徒歩', 'Walking'])),
     coordinates,
-    rent: rent,
-    deposit: deposit ? (deposit < 1000 ? deposit * 10000 : deposit) : null,
-    area: area,
-    floor: floor,
-    structure: structure,
-    availability: availability,
+    rent: rent ? (rent < 1000 ? rent * 10000 : rent) : null, // 万円→円変換
+    deposit: safeNumber(getFieldValue(fields, ['deposit', '敷金', 'Deposit'])),
+    area,
+    availability: safeString(getFieldValue(fields, ['status', '現況', 'Status'])),
     isAvailable: true,
     images,
     postedDate: new Date().toISOString(),
     lastUpdated: new Date().toISOString(),
-    featured: Math.random() < 0.1, // 10%の確率で注目物件
+    featured: Math.random() < 0.15,
     source: 'airtable',
-    notes: notes,
-    
-    // 詳細情報（PropertyDetail で使用）
     details: {
-      // 物件ID（MY-形式）
       propertyId: `MY-${record.id.slice(-8)}`,
-      
-      // 面積情報
-      usageArea: area,
-      
-      // 階数情報
-      currentFloor: floor,
-      
-      // 建物情報
-      buildingConstruction: structure,
-      
-      // 賃料情報（万円単位）
-      rentManYen: rent ? Math.round(rent / 10000 * 100) / 100 : null,
-      
-      // 保証金情報
-      securityDeposit: deposit,
-      securityDepositAmount: deposit,
-      
-      // 現況情報
-      currentStatus: availability,
-      
-      // 契約情報
-      moveInTiming: getFieldValue(fields, ['入居時期', '契約可能時期'], ['入居', '契約']),
-      contractPeriod: getFieldValue(fields, ['契約期間', '契約年数'], ['契約期間', '年数']),
-      
-      // 費用情報
-      managementFeeAmount: safeNumber(getFieldValue(fields, ['管理費', '共益費'], ['管理費', '共益費'])),
-      
-      // その他費用
-      otherMonthlyFeeName: getFieldValue(fields, ['その他費用名'], ['その他']),
-      otherMonthlyFeeAmount: safeNumber(getFieldValue(fields, ['その他費用'], ['その他費用'])),
-      
-      // 更新情報
-      renewalCategory: getFieldValue(fields, ['更新区分'], ['更新']),
-      renewalFeeAmount: safeNumber(getFieldValue(fields, ['更新料'], ['更新料'])),
-      
-      // 保険情報
-      insuranceObligation: getFieldValue(fields, ['保険加入義務'], ['保険']),
-      
-      // 原データ保持
-      rawFields: fields
+      rawFields: fields,
+      ...fields
     }
   };
 
@@ -652,10 +466,10 @@ export const fetchAllProperties = async () => {
         }
       })
       .filter(property => {
-        // 有効性チェック
         return property && 
                property.title && 
-               property.title.length > 5;
+               property.title.length > 5 && 
+               !property.title.includes('物件-rec');
       });
 
     console.log(`🎯 Valid properties: ${properties.length}/${allRecords.length}`);
@@ -666,26 +480,14 @@ export const fetchAllProperties = async () => {
       withCoordinates: properties.filter(p => p.coordinates).length,
       withImages: properties.filter(p => p.images.length > 0).length,
       withRent: properties.filter(p => p.rent).length,
-      withAddress: properties.filter(p => p.address && p.address.length > 5).length,
-      withStation: properties.filter(p => p.nearestStation).length,
-      withTrainLines: properties.filter(p => p.trainLines.length > 0).length
+      withAddress: properties.filter(p => p.address && p.address.length > 10).length,
+      withStation: properties.filter(p => p.nearestStation).length
     };
 
     console.log('📊 Data Quality Report:', qualityReport);
 
-    // サンプルデータの表示
     if (properties.length > 0) {
-      console.log('🔍 Sample property:', {
-        title: properties[0].title,
-        address: properties[0].address,
-        ward: properties[0].ward,
-        rent: properties[0].rent,
-        area: properties[0].area,
-        station: properties[0].nearestStation,
-        trainLines: properties[0].trainLines,
-        images: properties[0].images.length,
-        coordinates: !!properties[0].coordinates
-      });
+      console.log('🔍 Sample property:', properties[0]);
     }
 
     return properties;
