@@ -554,6 +554,11 @@ if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_NAME) {
 throw new Error('Missing required Airtable configuration');
 }
 
+// API設定の検証
+if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_NAME) {
+throw new Error('Missing required Airtable configuration');
+}
+
 // まず動作するビューを見つける
 const connectionResult=await tryMultipleViews(async (params)=> {
 return await airtableClient.get(`/${AIRTABLE_TABLE_NAME}`,{params});
@@ -657,6 +662,26 @@ return properties;
 
 } catch (error) {
 console.error('❌ Error fetching properties:',error);
+
+// 権限エラーの場合は詳細なメッセージを提供
+if (error.message.includes('API permission denied') || 
+error.response?.status === 403 || 
+error.response?.status === 401) {
+console.error('🚫 Airtable API Permission Error:');
+console.error('   - Check if your API key has access to the base and table');
+console.error('   - Verify the base ID and table name are correct');
+console.error('   - Ensure the API key has read permissions');
+return []; // 空配列を返してアプリケーションを継続
+}
+
+// 422エラーの場合
+if (error.response?.status === 422) {
+console.error('⚠️ Airtable Request Validation Error:');
+console.error('   - This may be due to incorrect view IDs or table configuration');
+console.error('   - Check if the table name and base ID are correct');
+return []; // 空配列を返してアプリケーションを継続
+}
+
 throw new Error(`Failed to fetch properties: ${error.message}`);
 }
 };
