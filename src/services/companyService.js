@@ -5,6 +5,7 @@ import {trainStationData,getStationsByLineName as getStationsFromCSV} from '../d
 const AIRTABLE_API_KEY=import.meta.env.VITE_AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID=import.meta.env.VITE_AIRTABLE_BASE_ID || 'appBFYfgbWNZyP0QR';
 const AIRTABLE_TABLE_NAME=import.meta.env.VITE_AIRTABLE_TABLE_NAME || 'Reins';
+const COMPANY_TABLE_NAME=import.meta.env.VITE_AIRTABLE_COMPANY_TABLE_NAME || 'Company';
 
 // 複数のビューIDを試す
 const POSSIBLE_VIEW_IDS=[
@@ -542,7 +543,7 @@ return transformedProperty;
 // 全物件データの取得（複数ビュー対応）
 export const fetchAllProperties=async ()=> {
   if (!AIRTABLE_API_KEY) {
-    console.warn('⚠️ Airtable API key not configured');
+    console.warn('⚠️ Airtable API key not configured. Please set VITE_AIRTABLE_API_KEY in your .env file.');
     return [];
   }
 
@@ -669,7 +670,7 @@ throw new Error(`Failed to fetch properties: ${error.message}`);
 // 特定の物件を取得
 export const fetchPropertyById=async (id)=> {
   if (!AIRTABLE_API_KEY) {
-    console.warn('⚠️ Airtable API key not configured');
+    console.warn('⚠️ Airtable API key not configured. Please set VITE_AIRTABLE_API_KEY in your .env file.');
     return null;
   }
 
@@ -755,6 +756,169 @@ return stats;
 console.error('❌ Error calculating stats:',error);
 return null;
 }
+};
+
+// 会社情報を取得
+const getActualCompanyInfo = () => {
+  return {
+    name: '株式会社ウエンズインターナショナル',
+    nameEn: 'Wens International Co., Ltd.',
+    description: '商業用不動産の仲介・管理、不動産情報サイトの運営',
+    phone: '03-3525-8791',
+    email: 'tenpotokyo@gmail.com',
+    fax: '03-3525-8791',
+    fullAddress: '〒101-0025 東京都千代田区神田佐久間町1-14　第２東ビル913',
+    postalCode: '101-0025',
+    prefecture: '東京都',
+    city: '千代田区',
+    address1: '神田佐久間町1-14',
+    address2: '第２東ビル913',
+    businessHours: '平日 9:00-18:00',
+    closedDays: '土日祝日',
+    established: '',
+    capital: '1000万円',
+    employees: '',
+    license: '',
+    president: '',
+    presidentTitle: '',
+    business: '商業用不動産の仲介・管理、不動産情報サイトの運営',
+    certifications: '',
+    googleMapsEmbed: '',
+    latitude: null,
+    longitude: null,
+    website: '',
+    twitter: '',
+    facebook: '',
+    instagram: '',
+    branches: [],
+    lastUpdated: new Date().toISOString(),
+    source: 'fallback'
+  };
+};
+
+export const fetchCompanyInfo = async () => {
+  try {
+    console.log('🏢 Fetching company information from Airtable...');
+    
+    // API設定の検証
+    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+      console.warn('⚠️ Missing Airtable configuration, using fallback data');
+      return getActualCompanyInfo();
+    }
+
+    const response = await airtableClient.get(`/${COMPANY_TABLE_NAME}`, {
+      params: {
+        maxRecords: 1,
+        view: 'Grid view'
+      }
+    });
+
+    if (response.data.records.length === 0) {
+      console.warn('⚠️ No company records found in table');
+      return getActualCompanyInfo();
+    }
+
+    const record = response.data.records[0];
+    const fields = record.fields;
+
+    console.log('📋 Available fields:', Object.keys(fields));
+
+    // 実際のAirtableフィールドに基づくマッピング
+    const companyInfo = {
+      // 基本情報
+      name: fields['会社名'] || '株式会社ウエンズインターナショナル',
+      nameEn: fields['会社名英語'] || 'Wens International Co., Ltd.',
+      description: fields['会社説明・事業内容'] || '商業用不動産の仲介・管理、不動産情報サイトの運営',
+
+      // 連絡先情報
+      phone: fields['電話番号'] || '03-3525-8791',
+      email: fields['メールアドレス'] || 'tenpotokyo@gmail.com',
+      fax: fields['FAX'] || '03-3525-8791',
+
+      // 住所情報（正確なデータ）
+      fullAddress: fields['本社住所（郵便番号含む）'] || '〒101-0025 東京都千代田区神田佐久間町1-14　第２東ビル913',
+      postalCode: '101-0025',
+      prefecture: '東京都',
+      city: '千代田区',
+      address1: '神田佐久間町1-14',
+      address2: '第２東ビル913',
+
+      // 営業情報
+      businessHours: fields['営業時間'] || '平日 9:00-18:00',
+      closedDays: fields['定休日'] || '土日祝日',
+
+      // 会社詳細
+      established: fields['設立年月日'] || '',
+      capital: fields['資本金'] || '1000万円',
+      employees: fields['従業員数'] || '',
+      license: fields['免許番号'] || '',
+
+      // 代表者情報
+      president: fields['代表者名'] || '',
+      presidentTitle: fields['役職'] || '',
+
+      // 事業内容
+      business: fields['会社説明・事業内容'] || '商業用不動産の仲介・管理、不動産情報サイトの運営',
+
+      // 資格・認定
+      certifications: fields['認定資格'] || '',
+
+      // 地図情報
+      googleMapsEmbed: fields['Google Maps埋め込み'] || '',
+      latitude: parseFloat(fields['緯度']) || null,
+      longitude: parseFloat(fields['経度']) || null,
+
+      // Web・SNS
+      website: fields['ウェブサイト'] || '',
+      twitter: fields['Twitter'] || '',
+      facebook: fields['Facebook'] || '',
+      instagram: fields['Instagram'] || '',
+
+      // その他
+      branches: [],
+
+      // メタデータ
+      lastUpdated: new Date().toISOString(),
+      source: 'airtable',
+      airtableRecordId: record.id
+    };
+
+    console.log('✅ Actual company info loaded from Airtable:', {
+      name: companyInfo.name,
+      phone: companyInfo.phone,
+      email: companyInfo.email,
+      address: companyInfo.fullAddress,
+      recordId: companyInfo.airtableRecordId
+    });
+
+    return companyInfo;
+
+  } catch (error) {
+    console.error('❌ Error fetching company info from Airtable:', error);
+    
+    // 詳細なエラーハンドリング
+    if (error.response?.status === 403) {
+      console.error('🚫 403 Forbidden - API key does not have access to Company table');
+      console.error('   Solutions:');
+      console.error('   1. Generate a new API key with proper permissions');
+      console.error('   2. Ensure the API key has read access to the Company table');
+      console.error('   3. Verify the base ID is correct');
+    } else if (error.response?.status === 401) {
+      console.error('🚫 401 Unauthorized - Invalid API key');
+      console.error('   Please check your VITE_AIRTABLE_API_KEY in .env file');
+    } else if (error.response?.status === 404) {
+      console.error('🚫 404 Not Found - Table or base not found');
+      console.error('   Please verify:');
+      console.error('   - Base ID (VITE_AIRTABLE_BASE_ID)');
+      console.error('   - Table name (Company)');
+    } else if (error.response?.status === 422) {
+      console.error('⚠️ 422 Unprocessable Entity - Request validation error');
+      console.error('   This may be due to incorrect view name or table configuration');
+    }
+
+    // エラー時は実際のデータを返す
+    return getActualCompanyInfo();
+  }
 };
 
 // その他のエクスポート

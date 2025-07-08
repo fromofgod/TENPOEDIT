@@ -542,7 +542,11 @@ return transformedProperty;
 // 全物件データの取得（複数ビュー対応）
 export const fetchAllProperties=async ()=> {
   if (!AIRTABLE_API_KEY) {
-    console.warn('⚠️ Airtable API key not configured');
+    console.warn('⚠️ Airtable API key not configured. Please set VITE_AIRTABLE_API_KEY in your .env file.');
+    console.warn('📝 Instructions:');
+    console.warn('   1. Go to https://airtable.com/create/tokens');
+    console.warn('   2. Create a new API key with read permissions');
+    console.warn('   3. Add it to your .env file as VITE_AIRTABLE_API_KEY=your_key_here');
     return [];
   }
 
@@ -689,7 +693,7 @@ throw new Error(`Failed to fetch properties: ${error.message}`);
 // 特定の物件を取得
 export const fetchPropertyById=async (id)=> {
   if (!AIRTABLE_API_KEY) {
-    console.warn('⚠️ Airtable API key not configured');
+    console.warn('⚠️ Airtable API key not configured. Please set VITE_AIRTABLE_API_KEY in your .env file.');
     return null;
   }
 
