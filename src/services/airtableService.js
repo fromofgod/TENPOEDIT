@@ -2,15 +2,12 @@ import axios from 'axios';
 import {trainStationData,getStationsByLineName as getStationsFromCSV} from '../data/trainStationData';
 
 // 環境変数またはデフォルト値を使用
-const AIRTABLE_API_KEY=import.meta.env.VITE_AIRTABLE_API_KEY || 'patxWbNWEvvGNDN1W.2822f4c546599d717d36798d909b35514362ab896d57612084dcd03627b9bcfe';
+const AIRTABLE_API_KEY=import.meta.env.VITE_AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID=import.meta.env.VITE_AIRTABLE_BASE_ID || 'appBFYfgbWNZyP0QR';
 const AIRTABLE_TABLE_NAME=import.meta.env.VITE_AIRTABLE_TABLE_NAME || 'Reins';
 
 // 複数のビューIDを試す
 const POSSIBLE_VIEW_IDS=[
-'shrKoKZIuYxzEI6K4',// 提供されたビューID
-'viwGridView',// 一般的なGrid view ID
-'Grid view',// ビュー名での指定
 null // ビュー指定なし（デフォルトビュー使用）
 ];
 
@@ -98,6 +95,25 @@ console.log(`⚠️ View "${viewId || 'Default view'}" returned 0 records`);
 } catch (error) {
 console.log(`❌ Failed with view "${viewId || 'Default view'}":`,error.message);
 lastError=error;
+
+// 403/401エラーの場合は即座に中断
+if (error.response?.status === 403 || error.response?.status === 401) {
+console.error('🚫 API key permission error - stopping view attempts');
+throw new Error(`API permission denied: ${error.message}`);
+}
+
+// 422エラーの場合も権限関連の可能性が高い
+if (error.response?.status === 422) {
+console.error('⚠️ Request validation error - possible permission issue');
+}
+
+// 403/401エラーの場合は即座に中断
+if (error.response?.status === 403 || error.response?.status === 401) {
+console.error('🚫 API key permission error - stopping view attempts');
+throw new Error(`API permission denied: ${error.message}`);
+}
+
+// 422エラーの場合も権限関連の可能性が高い
 }
 }
 
@@ -525,8 +541,18 @@ return transformedProperty;
 
 // 全物件データの取得（複数ビュー対応）
 export const fetchAllProperties=async ()=> {
+  if (!AIRTABLE_API_KEY) {
+    console.warn('⚠️ Airtable API key not configured');
+    return [];
+  }
+
 try {
 console.log('🚀 Fetching all properties from Airtable...');
+
+// API設定の検証
+if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_NAME) {
+throw new Error('Missing required Airtable configuration');
+}
 
 // まず動作するビューを見つける
 const connectionResult=await tryMultipleViews(async (params)=> {
@@ -637,6 +663,11 @@ throw new Error(`Failed to fetch properties: ${error.message}`);
 
 // 特定の物件を取得
 export const fetchPropertyById=async (id)=> {
+  if (!AIRTABLE_API_KEY) {
+    console.warn('⚠️ Airtable API key not configured');
+    return null;
+  }
+
 try {
 console.log(`🔍 Fetching property by ID: ${id}`);
 const response=await airtableClient.get(`/${AIRTABLE_TABLE_NAME}/${id}`);
